@@ -252,7 +252,7 @@ def optuna_objective(trial: optuna.Trial, base_cfg):
         # Assign sampled value
         if hp in cfg.training:
             cfg.training[hp] = sampled
-        elif hp in cfg.fw_lora:
+        elif "fw_lora" in cfg and hp in cfg.fw_lora:
             cfg.fw_lora[hp] = sampled
         elif hp == "lora_rank":
             cfg.model.lora.rank = int(sampled)
