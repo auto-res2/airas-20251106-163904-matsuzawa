@@ -235,7 +235,7 @@ def train_single_run(cfg) -> Dict[str, Any]:
 # -----------------------------------------------------------------------------
 
 def optuna_objective(trial: optuna.Trial, base_cfg):
-    cfg = OmegaConf.deepcopy(base_cfg)
+    cfg = OmegaConf.create(OmegaConf.to_container(base_cfg, resolve=False))
     # Sample hyper-parameters as described in cfg.optuna.search_space
     for hp, hp_conf in cfg.optuna.search_space.items():
         if hp_conf.type == "loguniform":
