@@ -6,5 +6,19 @@
     "prefix-tuning",
     "adapter tuning",
     "learning rate scheduling"
+  ],
+  "research_study_list": [
+    {
+      "title": "Adaptive Budget Allocation for Parameter-Efficient Fine-Tuning "
+    },
+    {
+      "title": "Parameter-Efficient Fine-Tuning Design Spaces"
+    },
+    {
+      "title": "On Robust Prefix-Tuning for Text Classification"
+    },
+    {
+      "title": "When Do Prompting and Prefix-Tuning Work? A Theory of Capabilities and Limitations"
+    }
   ]
 }
