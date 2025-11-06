@@ -18,8 +18,12 @@ def main(cfg):
     if cfg.mode == "trial":
         cfg.wandb.mode = "disabled"
         cfg.optuna.n_trials = 0
-        cfg.training = cfg.get("training", {})
+        # Disable struct mode to allow setting training attributes
+        OmegaConf.set_struct(cfg, False)
+        if "training" not in cfg:
+            cfg.training = {}
         cfg.training.epochs = 1
+        OmegaConf.set_struct(cfg, True)
     elif cfg.mode == "full":
         cfg.wandb.mode = "online"
     else:
