@@ -279,6 +279,7 @@ def main(cfg):  # noqa: C901  complexity fine for research script
         raise FileNotFoundError(f"Run config file not found: {run_cfg_path}")
 
     run_cfg = OmegaConf.load(run_cfg_path)
+    OmegaConf.set_struct(cfg, False)
     cfg = OmegaConf.merge(cfg, run_cfg)
 
     # Mode specific overrides -------------------------------------------------
