@@ -13,7 +13,7 @@ model:
       - query
       - key
       - value
-      - intermediate
+      - intermediate.dense
       - output.dense
 dataset:
   name: glue
