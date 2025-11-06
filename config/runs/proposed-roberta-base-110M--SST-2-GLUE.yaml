@@ -1,0 +1,63 @@
+run_id: proposed-roberta-base-110M--SST-2-GLUE
+method: proposed_fw_lora
+model:
+  name: roberta-base
+  pretrained_id: roberta-base
+  parameter_budget_percent: 0.2          # percentage of backbone params used by LoRA
+  lora:
+    enabled: true
+    rank: 8                              # default, will be tuned by Optuna
+    alpha: 16
+    dropout: 0.1
+    target_modules:                      # identical to AdaLoRA setup
+      - query
+      - key
+      - value
+      - intermediate
+      - output
+dataset:
+  name: glue
+  subset: sst2
+  split: train
+  eval_split: validation
+  max_length: 128
+  padding: max_length
+  truncation: true
+training:
+  epochs: 3
+  batch_size: 32
+  learning_rate: 2.0e-4
+  weight_decay: 0.01
+  optimizer: adamw
+  lr_scheduler: linear
+  warmup_ratio: 0.06
+  gradient_accumulation_steps: 1
+  mixed_precision: bf16                 # fits easily on A100/H200
+  seed: 42
+fw_lora:                                # Fisher-Weighted LoRA specific
+  lambda_fw: 1.0e-4
+  warmup_steps: 500
+  fisher_alpha: 0.98                    # EMA factor for Fisher proxy
+optuna:
+  n_trials: 30
+  direction: maximize                   # maximise dev-set accuracy
+  search_space:
+    learning_rate:
+      type: loguniform
+      low: 1.0e-4
+      high: 3.0e-4
+    lambda_fw:
+      type: loguniform
+      low: 5.0e-5
+      high: 5.0e-4
+    lora_rank:
+      type: categorical
+      choices: [4, 8, 16]
+    warmup_steps:
+      type: int
+      low: 300
+      high: 800
+      step: 100
+    batch_size:
+      type: categorical
+      choices: [16, 32, 64]
