@@ -1,0 +1,301 @@
+
+LLM Name: o3-2025-04-16
+Input:
+You are an AI code reviewer validating production-ready experiment code for research papers.
+
+Analyze the provided experiment code and determine if it meets all requirements for immediate execution in research experiments.
+
+# Instructions
+
+## Core Validation Criteria
+Check if the generated experiment code meets ALL of the following requirements:
+
+1. **Complete Implementation**:
+   - Every component is fully functional, production-ready, publication-worthy code
+   - No "omitted for brevity", no "simplified version", no TODO, PLACEHOLDER, pass, or ...
+   - All functions and classes are completely implemented
+   - No truncated code sections or incomplete implementations
+
+2. **Hydra Integration**:
+   - Uses Hydra to manage all experiment configurations from `config/runs/*.yaml` files
+   - All parameters are loaded from run configs dynamically
+   - Proper configuration structure with run_id, method, model, dataset, training, and optuna sections
+   - CLI interface matches:
+     * Training (full): `uv run python -u -m src.main run={run_id} results_dir={path} mode=full`
+     * Training (trial): `uv run python -u -m src.main run={run_id} results_dir={path} mode=trial`
+     * Evaluation: `uv run python -m src.evaluate results_dir={path} run_ids='["run-1", "run-2", ...]'` (independent execution)
+   - Code must automatically configure based on mode:
+     * When `cfg.mode == "trial"`: Set `cfg.wandb.mode = "disabled"`, `cfg.optuna.n_trials = 0`, epochs=1
+     * When `cfg.mode == "full"`: Set `cfg.wandb.mode = "online"` and use full configuration
+
+3. **Complete Data Pipeline**:
+   - Full data loading and preprocessing implementation
+   - Dataset-specific preprocessing is properly implemented
+   - No placeholder dataset loading code
+   - Proper error handling for data operations
+   - Uses `.cache/` as the cache directory for all datasets and models
+
+4. **Model Implementation**:
+   - Complete model architectures for all methods (proposed and comparative methods)
+   - No placeholders (TODO, PLACEHOLDER, pass, or incomplete implementations)
+   - When External Resources specify HuggingFace models: properly use and customize them (acceptable to wrap AutoModel, add adapters, etc.)
+   - When no external models specified: implement architectures from scratch using PyTorch primitives
+   - Model-specific configurations correctly applied
+   - Proper PyTorch usage throughout
+
+5. **File Structure Compliance**:
+   - Contains EXACTLY these required files (and NO other files):
+     * `src/train.py`
+     * `src/evaluate.py`
+     * `src/preprocess.py`
+     * `src/model.py`
+     * `src/main.py`
+     * `pyproject.toml`
+     * `config/config.yaml`
+   - NO additional files (e.g., NO `src/__init__.py`, NO `setup.py`, NO other Python files)
+   - No missing files from the structure
+   - All functionality contained within specified files
+
+6. **WandB Integration**:
+   - train.py initializes WandB and logs ALL metrics comprehensively:
+     * Use `wandb.log()` at each training step/batch/epoch with ALL relevant time-series metrics
+     * Log as frequently as possible (per-batch or per-epoch) to capture complete training dynamics
+     * Use `wandb.summary["key"] = value` to save final/best metrics (best_val_acc, final_test_acc, best_epoch, etc.)
+     * Metric names in train.py's wandb.log() MUST exactly match the keys used in evaluate.py's run.history()
+   - Optuna Integration: If using Optuna, DO NOT log intermediate trial results to WandB - only log the final run with best hyperparameters
+   - Code must automatically configure based on mode:
+     * When `cfg.mode == "trial"`: Set `cfg.wandb.mode = "disabled"` before any WandB operations
+     * When `cfg.mode == "full"`: Set `cfg.wandb.mode = "online"` before any WandB operations
+   - NO results.json or stdout JSON dumps in train.py
+   - config/config.yaml contains mandatory WandB settings (entity/project)
+   - `WANDB_API_KEY` environment variable is available for authentication
+
+7. **Configuration Files**:
+   - The generated code properly references config files via Hydra
+   - NOTE: config/runs/{run_id}.yaml files are provided separately (not in ExperimentCode)
+   - All run configurations match the experiment_runs provided
+   - Optuna search spaces are properly defined if applicable
+
+8. **Evaluation Script Independence**:
+   - evaluate.py is executed independently via `uv run python -m src.evaluate results_dir={path} run_ids='["run-1", "run-2"]'`
+   - Accepts `run_ids` parameter as JSON string list (parse with `json.loads(args.run_ids)`)
+   - main.py DOES NOT call evaluate.py
+   - evaluate.py loads WandB config from `config/config.yaml` (in repository root)
+   - evaluate.py retrieves comprehensive data from WandB API:
+     * Use `wandb.Api()` to get run data: `run = api.run(f"{entity}/{project}/{run_id}")`
+     * Retrieve: `history = run.history()`, `summary = run.summary._json_dict`, `config = dict(run.config)`
+   - **STEP 1: Per-Run Processing** (for each run_id):
+     * Export comprehensive run-specific metrics to: `{results_dir}/{run_id}/metrics.json`
+     * Generate run-specific figures (learning curves, confusion matrices) to: `{results_dir}/{run_id}/`
+     * Each run should have its own subdirectory with its metrics and figures
+   - **STEP 2: Aggregated Analysis** (after processing all runs):
+     * Export aggregated metrics to: `{results_dir}/comparison/aggregated_metrics.json`
+     * Compute secondary/derived metrics (e.g., improvement rate: (proposed - baseline) / baseline)
+     * Generate comparison figures to: `{results_dir}/comparison/`
+     * Cross-run comparison charts (bar charts, box plots)
+     * Performance metrics tables
+     * Statistical significance tests
+   - Proper figure quality: legends, annotations, tight_layout
+   - Follows GLOBALLY UNIQUE naming convention to prevent collisions:
+     * Per-run figures: `{run_id}_{figure_topic}[_<condition>][_pairN].pdf` (e.g., `run-1-proposed-bert-glue_learning_curve.pdf`)
+     * Comparison figures: `comparison_{figure_topic}[_<condition>][_pairN].pdf` (e.g., `comparison_accuracy_bar_chart.pdf`)
+   - train.py and main.py generate NO figures
+   - evaluate.py cannot run in trial_mode (no WandB data available when WandB disabled)
+
+9. **Mode-Based Implementation**:
+   - `mode` parameter controls experiment behavior (required parameter)
+   - When `cfg.mode == "trial"`:
+     * Properly reduces computational load: epochs=1, batches limited to 1-2, Optuna disabled (n_trials=0), small evaluation subset
+     * Automatically sets `cfg.wandb.mode = "disabled"`
+     * Purpose: Fast validation that code runs without errors
+   - When `cfg.mode == "full"`:
+     * Automatically sets `cfg.wandb.mode = "online"`
+     * Uses full configuration (full epochs, full Optuna trials, etc.)
+
+## Output Format
+Respond with a JSON object containing:
+- `is_code_ready`: boolean - true if ALL criteria are met, false otherwise
+- `code_issue`: string - specific issues found if any criteria are not met, focusing on what needs to be fixed
+
+# Hypothesis
+open_problems='AdaLoRA shows that giving every weight matrix the same LoRA rank is wasteful, but its importance metric needs SVD on every step, several hand-tuned hyper-parameters and ≈10–20 % extra run-time. A simpler, cheaper way to bias the parameter budget toward truly useful layers is still missing.' method='Fisher-Weighted LoRA (FW-LoRA) – add one line to the loss of a standard LoRA model.\n1. Warm-up phase (first K≈500 optimisation steps): run ordinary LoRA training and accumulate an exponential moving average of the squared gradient of the original pretrained weights:  F_m = EMA_t[ ||∇_t W_m||_F² ].  This is a cheap diagonal Fisher-information proxy per weight matrix m.\n2. After warm-up freeze the F_m values and compute a normalised importance score  I_m = F_m / Σ_m F_m.\n3. Add a Fisher-weighted L2 shrinkage term on every LoRA update matrix ΔW_m:\n   L_total = L_task  +  λ · Σ_m (1 − I_m) · ||ΔW_m||_F²\n   (λ≈1e-4).\nMatrices that rarely receive gradient signal (small I_m) are automatically pushed toward zero; those that matter are almost unaffected. No SVD, no rank scheduler, no extra forward/backward pass.' experimental_setup='Model: roberta-base with standard LoRA applied to query/key/value and feed-forward projections (same as AdaLoRA).\nDataset: SST-2 (sentiment) ⟶ accuracy; CoLA ⟶ Matthews corr.  Both fit in <15 min on one GPU.\nParameter budgets: 0.1 %, 0.2 %, 0.5 % of full parameters.\nBaselines: (a) Plain LoRA, (b) AdaLoRA (public code, default settings).\nTraining details: 3 epochs, batch 32, lr 2e-4, AdamW, warm-up ratio 0.06.\nCompare accuracy/MCC and wall-clock training time.' experimental_code='# core change – regularised loss\ndef fw_lora_loss(model, inputs, labels, fisher_scores, lambda_fw):\n    outputs = model(**inputs)\n    ce_loss = F.cross_entropy(outputs.logits, labels)\n    reg_loss = 0.0\n    for name, param in model.named_parameters():\n        if "lora_A" in name or "lora_B" in name:  # LoRA matrices\n            base_name = name.split(".")[0]          # map to original weight matrix\n            importance = fisher_scores.get(base_name, 0.0)\n            reg_loss += (1.0 - importance) * (param**2).sum()\n    return ce_loss + lambda_fw * reg_loss\n\n# accumulate Fisher during warm-up\nfisher_scores = defaultdict(float)\nfisher_alpha = 0.98  # EMA factor\nfor step, batch in enumerate(train_loader):\n    outputs = model(**batch)\n    loss = F.cross_entropy(outputs.logits, batch["labels"])\n    loss.backward()\n    if step < warmup_steps:\n        with torch.no_grad():\n            for name, param in model.named_parameters():\n                if "weight" in name and param.grad is not None:\n                    fisher_scores[name] = fisher_alpha * fisher_scores[name] + (1-fisher_alpha) * param.grad.pow(2).sum().item()\n    else:\n        loss = fw_lora_loss(model, batch, batch["labels"], fisher_scores_norm, lambda_fw)\n        loss.backward()\n    optimizer.step(); optimizer.zero_grad()\n# normalise once after warm-up\nfisher_scores_norm = {k:v/sum(fisher_scores.values()) for k,v in fisher_scores.items()}' expected_result='FW-LoRA matches or slightly exceeds AdaLoRA with <1 % slower than vanilla LoRA (≈10–15 % faster than AdaLoRA).  Example SST-2 (0.2 % budget): LoRA 93.1, AdaLoRA 94.3, FW-LoRA 94.1.  CoLA (0.2 %): LoRA 55.0, AdaLoRA 57.8, FW-LoRA 57.5.  Training time: LoRA 1×, FW-LoRA 1.01×, AdaLoRA 1.12×.' expected_conclusion='A single Fisher-weighted shrinkage term lets the model focus its tiny LoRA budget on layers that actually influence the task, giving almost the entire accuracy gain of AdaLoRA but with the simplicity, speed and hyper-parameter-lightness of vanilla LoRA.  This shows that inexpensive first-order importance signals are sufficient for effective budget re-allocation during parameter-efficient fine-tuning.'
+
+# Current Research Method
+Fisher-Weighted LoRA (FW-LoRA) – add one line to the loss of a standard LoRA model.
+1. Warm-up phase (first K≈500 optimisation steps): run ordinary LoRA training and accumulate an exponential moving average of the squared gradient of the original pretrained weights:  F_m = EMA_t[ ||∇_t W_m||_F² ].  This is a cheap diagonal Fisher-information proxy per weight matrix m.
+2. After warm-up freeze the F_m values and compute a normalised importance score  I_m = F_m / Σ_m F_m.
+3. Add a Fisher-weighted L2 shrinkage term on every LoRA update matrix ΔW_m:
+   L_total = L_task  +  λ · Σ_m (1 − I_m) · ||ΔW_m||_F²
+   (λ≈1e-4).
+Matrices that rarely receive gradient signal (small I_m) are automatically pushed toward zero; those that matter are almost unaffected. No SVD, no rank scheduler, no extra forward/backward pass.
+
+# Experimental Design
+- Strategy: The goal is to show that Fisher-Weighted LoRA (FW-LoRA) can concentrate a tiny parameter budget on the weight matrices that matter while being as fast and simple as vanilla LoRA and almost as accurate as AdaLoRA.  We fine-tune a single backbone model – “roberta-base (110 M params)” – on two standard GLUE classification tasks that are small enough to run in minutes on one A100/H200: SST-2 for sentiment analysis and CoLA for grammatical acceptability.  Three LoRA budgets are evaluated (0.1 %, 0.2 %, 0.5 % of the backbone’s parameters).  
+
+Workflow
+1. Load the frozen HuggingFace roberta-base weights and insert standard LoRA adapters (query/key/value and both feed-forward projections) at a uniform initial rank r such that the total added parameters match the chosen budget.
+2. Warm-up phase (≈500 optimiser steps): ordinary cross-entropy training; meanwhile accumulate an exponential moving average of the squared gradient norm of every frozen weight matrix.  This yields per-matrix Fisher proxies F_m.
+3. Normalise once to importance scores I_m = F_m / Σ_m F_m.
+4. Continue training for the remaining steps/epochs with the modified loss
+     L_total = L_task + λ Σ_m (1−I_m)‖ΔW_m‖²
+   where λ is a single shrinkage coefficient (default 1e-4).
+   Matrices that rarely receive gradient signal (low I_m) are penalised and therefore their LoRA updates shrink towards zero, effectively reallocating the rank budget to important layers without SVD or custom schedulers.
+5. Evaluate after each epoch on the dev splits of SST-2 (Accuracy) and CoLA (Matthews Corr.).  Record wall-clock training time.
+6. Compare against two baselines trained with identical optimisation hyper-parameters: (a) plain LoRA with uniform rank, (b) AdaLoRA (public reference implementation with its default importance-metric SVD and rank scheduler).
+
+Hardware fit: one GPU of the stated cluster is more than sufficient; peak memory << 24 GB.  Total run-time ≃15 min per setting.
+- Proposed Method: Fisher-Weighted LoRA (FW-LoRA) is a drop-in replacement for ordinary LoRA fine-tuning that automatically down-weights update matrices belonging to unimportant backbone layers.
+Theoretical basis: for small parameter updates, the diagonal of the Fisher information approximates how much each weight influences the loss.  By accumulating an EMA of squared gradients during an initial warm-up we obtain cheap per-matrix Fisher proxies.  After normalisation we use (1−I_m) as a coefficient in an L2 penalty on each LoRA matrix ΔW_m.  High-Fisher (important) layers receive near-zero regularisation, low-Fisher layers are strongly shrunk, causing their effective rank to collapse while important layers keep their capacity – all without modifying the optimiser, adding extra passes, or running expensive SVDs like AdaLoRA.  The only new hyper-parameters are λ (regularisation scale) and the warm-up length K; defaults (1e-4, 500 steps) work well across tasks.
+- Evaluation Metrics: ['Accuracy', 'Matthews Correlation', 'Wall-clock Training Time']
+
+# Experiment Runs
+
+- Run ID: proposed-roberta-base-110M--SST-2-GLUE
+  Method: proposed
+  Model: roberta-base (110M)
+  Dataset: SST-2 (GLUE)
+  
+  Config Content:
+  ```yaml
+  run_id: proposed-roberta-base-110M--SST-2-GLUE
+method: proposed_fw_lora
+model:
+  name: roberta-base
+  pretrained_id: roberta-base
+  parameter_budget_percent: 0.2          # percentage of backbone params used by LoRA
+  lora:
+    enabled: true
+    rank: 8                              # default, will be tuned by Optuna
+    alpha: 16
+    dropout: 0.1
+    target_modules:                      # identical to AdaLoRA setup
+      - query
+      - key
+      - value
+      - intermediate
+      - output
+dataset:
+  name: glue
+  subset: sst2
+  split: train
+  eval_split: validation
+  max_length: 128
+  padding: max_length
+  truncation: true
+training:
+  epochs: 3
+  batch_size: 32
+  learning_rate: 2.0e-4
+  weight_decay: 0.01
+  optimizer: adamw
+  lr_scheduler: linear
+  warmup_ratio: 0.06
+  gradient_accumulation_steps: 1
+  mixed_precision: bf16                 # fits easily on A100/H200
+  seed: 42
+fw_lora:                                # Fisher-Weighted LoRA specific
+  lambda_fw: 1.0e-4
+  warmup_steps: 500
+  fisher_alpha: 0.98                    # EMA factor for Fisher proxy
+optuna:
+  n_trials: 30
+  direction: maximize                   # maximise dev-set accuracy
+  search_space:
+    learning_rate:
+      type: loguniform
+      low: 1.0e-4
+      high: 3.0e-4
+    lambda_fw:
+      type: loguniform
+      low: 5.0e-5
+      high: 5.0e-4
+    lora_rank:
+      type: categorical
+      choices: [4, 8, 16]
+    warmup_steps:
+      type: int
+      low: 300
+      high: 800
+      step: 100
+    batch_size:
+      type: categorical
+      choices: [16, 32, 64]
+
+  ```
+  
+
+- Run ID: comparative-1-roberta-base-110M--SST-2-GLUE
+  Method: comparative-1
+  Model: roberta-base (110M)
+  Dataset: SST-2 (GLUE)
+  
+  Config Content:
+  ```yaml
+  run_id: comparative-1-roberta-base-110M--SST-2-GLUE
+method: baseline_lora                  # plain uniform-rank LoRA
+model:
+  name: roberta-base
+  pretrained_id: roberta-base
+  parameter_budget_percent: 0.2
+  lora:
+    enabled: true
+    rank: 8
+    alpha: 16
+    dropout: 0.1
+    target_modules:
+      - query
+      - key
+      - value
+      - intermediate
+      - output
+dataset:
+  name: glue
+  subset: sst2
+  split: train
+  eval_split: validation
+  max_length: 128
+  padding: max_length
+  truncation: true
+training:
+  epochs: 3
+  batch_size: 32
+  learning_rate: 2.0e-4
+  weight_decay: 0.01
+  optimizer: adamw
+  lr_scheduler: linear
+  warmup_ratio: 0.06
+  gradient_accumulation_steps: 1
+  mixed_precision: bf16
+  seed: 42
+optuna:
+  n_trials: 20
+  direction: maximize
+  search_space:
+    learning_rate:
+      type: loguniform
+      low: 1.0e-5
+      high: 3.0e-4
+    lora_rank:
+      type: categorical
+      choices: [4, 8, 16]
+    batch_size:
+      type: categorical
+      choices: [16, 32, 64]
+    weight_decay:
+      type: uniform
+      low: 0.0
+      high: 0.05
+
+  ```
+  
+
+
+# Generated Experiment Code (To be validated)
+{"config_yaml": "# Global Hydra configuration\ndefaults:\n  - _self_\n\nrun: null      # will be overridden on CLI, e.g. run=proposed-roberta-base-110M--SST-2-GLUE\nresults_dir: ./results\nmode: full     # \u0027trial\u0027 or \u0027full\u0027\n\nwandb:\n  entity: gengaru617-personal\n  project: 251106-test\n  mode: online  # will switch to disabled in trial mode\n\noptuna:\n  n_trials: 0   # overridden by run config\n  direction: maximize\n  search_space: {}\n", "evaluate_py": "import argparse\nimport json\nimport os\nfrom pathlib import Path\nfrom typing import List, Dict\nimport wandb\nimport pandas as pd\nimport matplotlib.pyplot as plt\nimport seaborn as sns\nimport hydra\nfrom omegaconf import OmegaConf\n\n\n# -------------------------------------------------------------\n#  Helper functions\n# -------------------------------------------------------------\n\ndef save_json(obj, path: Path):\n    path.parent.mkdir(parents=True, exist_ok=True)\n    with path.open(\"w\") as f:\n        json.dump(obj, f, indent=2)\n\n\ndef plot_learning_curve(df: pd.DataFrame, metric: str, run_id: str, out_dir: Path):\n    plt.figure(figsize=(7, 4))\n    sns.lineplot(x=df.index, y=df[metric])\n    plt.title(f\"{run_id} {metric}\")\n    plt.xlabel(\"Step\")\n    plt.ylabel(metric)\n    plt.tight_layout()\n    fname = out_dir / f\"{run_id}_{metric}_learning_curve.pdf\"\n    plt.savefig(fname)\n    plt.close()\n    return fname\n\n\ndef aggregate_metrics(run_summaries: Dict[str, Dict]) -\u003e Dict[str, float]:\n    agg = {}\n    for run_id, summ in run_summaries.items():\n        for k, v in summ.items():\n            agg.setdefault(k, {})[run_id] = v\n    return agg\n\n\ndef plot_bar_comparison(metric_dict: Dict[str, Dict], metric: str, out_dir: Path):\n    data = {\"run_id\": list(metric_dict[metric].keys()), metric: list(metric_dict[metric].values())}\n    df = pd.DataFrame(data)\n    plt.figure(figsize=(6, 4))\n    sns.barplot(data=df, x=\"run_id\", y=metric)\n    plt.title(f\"Comparison of {metric}\")\n    plt.ylabel(metric)\n    plt.xticks(rotation=45, ha=\"right\")\n    for i, v in enumerate(df[metric]):\n        plt.text(i, v + 0.001, f\"{v:.3f}\", ha=\"center\", va=\"bottom\")\n    plt.tight_layout()\n    fname = out_dir / f\"comparison_{metric}_bar_chart.pdf\"\n    plt.savefig(fname)\n    plt.close()\n    return fname\n\n\n# -------------------------------------------------------------\n#  Main evaluation script\n# -------------------------------------------------------------\n\ndef main():\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"results_dir\", type=str, help=\"Directory to store evaluation artifacts\")\n    parser.add_argument(\"run_ids\", type=str, help=\u0027JSON list of run IDs, e.g. \"[\\\"run-1\\\", \\\"run-2\\\"]\"\u0027)\n    args = parser.parse_args()\n\n    results_dir = Path(args.results_dir)\n    run_ids: List[str] = json.loads(args.run_ids)\n\n    # Load wandb config to know entity/project\n    cfg_path = Path(__file__).resolve().parent.parent / \"config\" / \"config.yaml\"\n    cfg = OmegaConf.load(cfg_path)\n    entity, project = cfg.wandb.entity, cfg.wandb.project\n\n    api = wandb.Api()\n\n    run_summaries = {}\n    generated_files = []\n\n    # ---------------------------------------------------------\n    #  Per-run processing\n    # ---------------------------------------------------------\n    for rid in run_ids:\n        run = api.run(f\"{entity}/{project}/{rid}\")\n        history = run.history()  # pandas DataFrame\n        summary = run.summary._json_dict\n        config = dict(run.config)\n\n        run_dir = results_dir / rid\n        run_dir.mkdir(parents=True, exist_ok=True)\n\n        # Save metrics\n        metrics_path = run_dir / \"metrics.json\"\n        save_json({\"summary\": summary, \"config\": config}, metrics_path)\n        generated_files.append(metrics_path)\n\n        # Learning curves\n        if \"train_loss\" in history.columns:\n            fname = plot_learning_curve(history, \"train_loss\", rid, run_dir)\n            generated_files.append(fname)\n        if \"eval_acc\" in history.columns:\n            fname = plot_learning_curve(history, \"eval_acc\", rid, run_dir)\n            generated_files.append(fname)\n\n        run_summaries[rid] = {\n            \"best_eval_acc\": summary.get(\"best_eval_acc\"),\n            \"runtime_sec\": summary.get(\"runtime_sec\"),\n        }\n\n    # ---------------------------------------------------------\n    #  Aggregated analysis\n    # ---------------------------------------------------------\n    comparison_dir = results_dir / \"comparison\"\n    comparison_dir.mkdir(parents=True, exist_ok=True)\n\n    agg_metrics = aggregate_metrics(run_summaries)\n    agg_path = comparison_dir / \"aggregated_metrics.json\"\n    save_json(agg_metrics, agg_path)\n    generated_files.append(agg_path)\n\n    # Bar chart comparisons\n    for metric in [\"best_eval_acc\", \"runtime_sec\"]:\n        if metric in agg_metrics:\n            fname = plot_bar_comparison(agg_metrics, metric, comparison_dir)\n            generated_files.append(fname)\n\n    # Derived improvement ratios if at least 2 runs\n    if len(run_ids) \u003e= 2:\n        base_run, other_run = run_ids[0], run_ids[1]\n        if \"best_eval_acc\" in agg_metrics and base_run in agg_metrics[\"best_eval_acc\"] and other_run in agg_metrics[\"best_eval_acc\"]:\n            base = agg_metrics[\"best_eval_acc\"][base_run]\n            prop = agg_metrics[\"best_eval_acc\"][other_run]\n            improvement = (prop - base) / base if base else None\n            derived_path = comparison_dir / \"derived_metrics.json\"\n            save_json({\"improvement\": improvement}, derived_path)\n            generated_files.append(derived_path)\n\n    # Print file paths\n    for fp in generated_files:\n        print(str(fp))\n\n\nif __name__ == \"__main__\":\n    main()\n", "main_py": "import os\nimport subprocess\nimport sys\nimport hydra\nfrom omegaconf import OmegaConf\n\n\n@hydra.main(config_path=\"../config\", config_name=\"config\", version_base=None)\ndef main(cfg):\n    \"\"\"Orchestrator that spawns a subprocess for the specified run ID.\"\"\"\n    orig_cwd = hydra.utils.get_original_cwd()\n    run_cfg_path = os.path.join(orig_cwd, \"config\", \"runs\", f\"{cfg.run}.yaml\")\n    if not os.path.exists(run_cfg_path):\n        raise FileNotFoundError(f\"Run config not found: {run_cfg_path}\")\n\n    # Mode adjustments\n    if cfg.mode == \"trial\":\n        cfg.wandb.mode = \"disabled\"\n        cfg.optuna.n_trials = 0\n    elif cfg.mode == \"full\":\n        cfg.wandb.mode = \"online\"\n    else:\n        raise ValueError(\"mode must be \u0027trial\u0027 or \u0027full\u0027\")\n\n    # Serialize current cfg to pass via env var (Hydra will still load)\n    os.environ[\"HYDRA_FULL_CONFIG\"] = OmegaConf.to_yaml(cfg)\n\n    cmd = [\n        sys.executable,\n        \"-u\",\n        \"-m\",\n        \"src.train\",\n        f\"run={cfg.run}\",\n        f\"results_dir={cfg.results_dir}\",\n        f\"mode={cfg.mode}\",\n    ]\n    print(\"Launching training subprocess:\", \" \".join(cmd))\n    subprocess.run(cmd, check=True)\n\n\nif __name__ == \"__main__\":\n    main()\n", "model_py": "from typing import List\nfrom omegaconf import DictConfig\nfrom transformers import AutoConfig, AutoModelForSequenceClassification\nfrom peft import LoraConfig, get_peft_model\nimport torch.nn as nn\n\n\ndef build_lora_model(cfg: DictConfig, num_labels: int) -\u003e nn.Module:\n    \"\"\"Load a pretrained model and wrap with LoRA using PEFT.\"\"\"\n    base_config = AutoConfig.from_pretrained(cfg.model.pretrained_id, num_labels=num_labels, cache_dir=\".cache/\")\n    base_model = AutoModelForSequenceClassification.from_pretrained(cfg.model.pretrained_id, config=base_config, cache_dir=\".cache/\")\n\n    # LoRA configuration via PEFT\n    if cfg.model.lora.enabled:\n        lora_cfg = LoraConfig(\n            r=cfg.model.lora.rank,\n            lora_alpha=cfg.model.lora.alpha,\n            lora_dropout=cfg.model.lora.dropout,\n            target_modules=cfg.model.lora.target_modules,\n            bias=\"none\",\n            task_type=\"SEQ_CLS\",\n        )\n        model = get_peft_model(base_model, lora_cfg)\n    else:\n        model = base_model\n\n    # Ensure base weights still receive gradients for Fisher accumulation but are not updated by optimiser\n    for name, param in model.named_parameters():\n        if (\"lora_A\" in name) or (\"lora_B\" in name):\n            param.requires_grad = True\n        else:\n            # Keep grad for fisher while freezing for optimisation\n            param.requires_grad = True\n    return model\n\n\ndef group_parameters(model: nn.Module, lr: float, weight_decay: float):\n    \"\"\"Prepare parameter groups for optimiser: only train LoRA and classifier weights.\"\"\"\n    no_decay = [\"bias\", \"LayerNorm.weight\"]\n    lora_or_classifier = []\n    for n, p in model.named_parameters():\n        if (\"lora_A\" in n) or (\"lora_B\" in n) or (\"classifier\" in n):\n            lora_or_classifier.append((n, p))\n\n    params_with_decay = [p for n, p in lora_or_classifier if not any(nd in n for nd in no_decay)]\n    params_without_decay = [p for n, p in lora_or_classifier if any(nd in n for nd in no_decay)]\n\n    return [\n        {\"params\": params_with_decay, \"lr\": lr, \"weight_decay\": weight_decay},\n        {\"params\": params_without_decay, \"lr\": lr, \"weight_decay\": 0.0},\n    ]\n", "preprocess_py": "from typing import Tuple\nfrom datasets import load_dataset\nfrom transformers import PreTrainedTokenizerBase\nfrom torch.utils.data import Dataset\n\n\ndef build_datasets(cfg, tokenizer: PreTrainedTokenizerBase) -\u003e Tuple[Dataset, Dataset, int]:\n    \"\"\"Load and preprocess datasets according to cfg using the HF datasets lib.\"\"\"\n    name = cfg.dataset.name\n    subset = cfg.dataset.get(\"subset\", None)\n    cache_dir = \".cache/\"\n\n    raw_ds = load_dataset(name, subset, cache_dir=cache_dir)\n    train_ds = raw_ds[cfg.dataset.split]\n    eval_ds = raw_ds[cfg.dataset.eval_split]\n\n    def preprocess_fn(example):\n        return tokenizer(example[\"sentence\" if subset != \"cola\" else \"sentence\"],\n                          max_length=cfg.dataset.max_length,\n                          padding=cfg.dataset.padding,\n                          truncation=cfg.dataset.truncation)\n\n    # Map\n    train_ds = train_ds.map(preprocess_fn, batched=True, remove_columns=train_ds.column_names)\n    eval_ds = eval_ds.map(preprocess_fn, batched=True, remove_columns=eval_ds.column_names)\n\n    # Rename label key to labels\n    train_ds = train_ds.rename_column(\"label\", \"labels\")\n    eval_ds = eval_ds.rename_column(\"label\", \"labels\")\n\n    num_labels = 2 if subset == \"sst2\" else 2  # CoLA also binary (acceptable / not)\n\n    return train_ds, eval_ds, num_labels\n", "pyproject_toml": "[build-system]\nrequires = [\"setuptools\u003e=42\", \"wheel\"]\n\n[project]\nname = \"fw-lora-experiments\"\nversion = \"0.1.0\"\ndescription = \"Research experiments for Fisher-Weighted LoRA\"\nauthors = [{name = \"Researcher\", email = \"research@example.com\"}]\n\n[project.dependencies]\nhydra-core = \"^1.3.2\"\nwandb = \"^0.16.1\"\ntorch = \"^2.1.0\"\ntransformers = \"^4.35.0\"\ndatasets = \"^2.14.5\"\npeft = \"^0.6.2\"\noptuna = \"^3.4.0\"\nomegaconf = \"^2.3.0\"\nscikit-learn = \"^1.3.2\"\nmatplotlib = \"^3.8.0\"\nseaborn = \"^0.13.0\"\npandas = \"^2.1.3\"\n", "train_py": "import os\nimport sys\nimport time\nimport json\nimport subprocess\nfrom collections import defaultdict\nfrom typing import Dict, Any, Tuple\nimport hydra\nfrom omegaconf import OmegaConf\nimport torch\nfrom torch import nn\nfrom torch.utils.data import DataLoader\nfrom transformers import (AutoTokenizer, AutoConfig, AutoModelForSequenceClassification,\n                          DataCollatorWithPadding, get_scheduler)\nfrom datasets import load_dataset, load_metric\nimport wandb\nimport optuna\n\nfrom src.preprocess import build_datasets\nfrom src.model import build_lora_model, group_parameters\n\n\ndef set_seed(seed: int):\n    import random, numpy as np\n    random.seed(seed)\n    np.random.seed(seed)\n    torch.manual_seed(seed)\n    torch.cuda.manual_seed_all(seed)\n\n\n# -------------------------------------------------------------\n#  Helper: Fisher-Weighted Regularisation\n# -------------------------------------------------------------\n\ndef accumulate_fisher(fisher_dict: Dict[str, torch.Tensor], model: nn.Module, alpha: float):\n    \"\"\"EMA accumulation of squared gradients for every (frozen) base weight.\"\"\"\n    with torch.no_grad():\n        for n, p in model.named_parameters():\n            if (\"lora_A\" in n) or (\"lora_B\" in n):\n                # Skip LoRA parameters\n                continue\n            if p.grad is None:\n                continue\n            g2 = p.grad.pow(2).sum().detach()\n            if n not in fisher_dict:\n                fisher_dict[n] = g2.clone()\n            else:\n                fisher_dict[n].mul_(alpha).add_(g2, alpha=1 - alpha)\n\n\ndef normalise_fisher(fisher_dict: Dict[str, torch.Tensor]) -\u003e Dict[str, torch.Tensor]:\n    total = sum([v.item() for v in fisher_dict.values()]) + 1e-12\n    return {k: v.item() / total for k, v in fisher_dict.items()}\n\n\ndef fw_lora_regularisation(model: nn.Module, fisher_scores: Dict[str, float]) -\u003e torch.Tensor:\n    reg = torch.tensor(0.0, device=next(model.parameters()).device)\n    for n, p in model.named_parameters():\n        if (\"lora_A\" in n) or (\"lora_B\" in n):\n            # Map to base weight name\n            base_name = n.replace(\".lora_A.weight\", \".weight\").replace(\".lora_B.weight\", \".weight\")\n            importance = fisher_scores.get(base_name, 0.0)\n            reg = reg + (1.0 - importance) * p.pow(2).sum()\n    return reg\n\n\n# -------------------------------------------------------------\n#  Training Loop (single run, possibly after Optuna search)\n# -------------------------------------------------------------\n\ndef train_single_run(cfg) -\u003e Dict[str, Any]:\n    set_seed(cfg.training.seed)\n\n    device = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\n\n    # ---------------------------------------------------------\n    #  Data\n    # ---------------------------------------------------------\n    tokenizer = AutoTokenizer.from_pretrained(cfg.model.pretrained_id, cache_dir=\".cache/\")\n    train_ds, eval_ds, num_labels = build_datasets(cfg, tokenizer)\n    data_collator = DataCollatorWithPadding(tokenizer=tokenizer, pad_to_multiple_of=8)\n\n    train_loader = DataLoader(train_ds, batch_size=cfg.training.batch_size, shuffle=True, collate_fn=data_collator)\n    eval_loader = DataLoader(eval_ds, batch_size=cfg.training.batch_size, shuffle=False, collate_fn=data_collator)\n\n    # ---------------------------------------------------------\n    #  Model \u0026 Optimiser\n    # ---------------------------------------------------------\n    model = build_lora_model(cfg, num_labels)\n    model.to(device)\n    model.train()\n\n    # Parameter groups: only LoRA + classifier weights optimise\n    optim_groups = group_parameters(model, lr=cfg.training.learning_rate, weight_decay=cfg.training.weight_decay)\n    optimizer = torch.optim.AdamW(optim_groups)\n\n    num_update_steps_per_epoch = len(train_loader) // cfg.training.gradient_accumulation_steps\n    num_training_steps = cfg.training.epochs * num_update_steps_per_epoch\n\n    lr_scheduler = get_scheduler(\n        name=cfg.training.lr_scheduler,\n        optimizer=optimizer,\n        num_warmup_steps=int(cfg.training.warmup_ratio * num_training_steps),\n        num_training_steps=num_training_steps,\n    )\n\n    metric_acc = load_metric(\"accuracy\")\n    metric_mcc = load_metric(\"matthews_correlation\")\n\n    # ---------------------------------------------------------\n    #  Fisher accumulation storage\n    # ---------------------------------------------------------\n    fisher_scores: Dict[str, torch.Tensor] = {}\n    fisher_final: Dict[str, float] = {}\n    fw_enabled = cfg.method == \"proposed_fw_lora\"\n\n    scaler = torch.cuda.amp.GradScaler(enabled=\"fp16\" in str(cfg.training.mixed_precision).lower() or \"bf16\" in str(cfg.training.mixed_precision).lower())\n\n    global_step = 0\n    start_time = time.time()\n    best_eval_metric = -1.0\n\n    for epoch in range(cfg.training.epochs):\n        epoch_loss = 0.0\n        correct = 0\n        total = 0\n        for step, batch in enumerate(train_loader):\n            model.train()\n            batch = {k: v.to(device) for k, v in batch.items()}\n            labels = batch.pop(\"labels\")\n\n            with torch.cuda.amp.autocast(enabled=scaler.is_enabled()):\n                outputs = model(**batch)\n                loss = nn.functional.cross_entropy(outputs.logits, labels)\n                # Fisher accumulation during warm-up\n                if fw_enabled and global_step \u003c cfg.fw_lora.warmup_steps:\n                    pass  # warm-up plain loss only\n                elif fw_enabled:\n                    reg = fw_lora_regularisation(model, fisher_final)\n                    loss = loss + cfg.fw_lora.lambda_fw * reg\n\n            scaler.scale(loss).backward()\n\n            # Fisher accumulation step\n            if fw_enabled and global_step \u003c cfg.fw_lora.warmup_steps:\n                accumulate_fisher(fisher_scores, model, cfg.fw_lora.fisher_alpha)\n\n            if (step + 1) % cfg.training.gradient_accumulation_steps == 0:\n                scaler.step(optimizer)\n                scaler.update()\n                optimizer.zero_grad()\n                lr_scheduler.step()\n\n            epoch_loss += loss.item() * labels.size(0)\n            preds = outputs.logits.argmax(dim=-1)\n            correct += (preds == labels).sum().item()\n            total += labels.size(0)\n            global_step += 1\n\n            # Limit batches in trial mode\n            if cfg.mode == \"trial\" and step \u003e 1:\n                break\n\n        # After warm-up, freeze fisher stats once\n        if fw_enabled and (global_step \u003e= cfg.fw_lora.warmup_steps) and (not fisher_final):\n            fisher_final = normalise_fisher(fisher_scores)\n            # Free the original tensor refs to save mem\n            fisher_scores = {}\n\n        train_acc = correct / max(1, total)\n        train_loss = epoch_loss / max(1, total)\n\n        # ---------------- Evaluation -------------------------\n        model.eval()\n        eval_correct = 0\n        eval_total = 0\n        eval_loss_total = 0.0\n        all_preds, all_labels = [], []\n        with torch.no_grad():\n            for step, batch in enumerate(eval_loader):\n                batch = {k: v.to(device) for k, v in batch.items()}\n                labels = batch.pop(\"labels\")\n                with torch.cuda.amp.autocast(enabled=scaler.is_enabled()):\n                    outputs = model(**batch)\n                    loss = nn.functional.cross_entropy(outputs.logits, labels)\n                eval_loss_total += loss.item() * labels.size(0)\n                preds = outputs.logits.argmax(dim=-1)\n                eval_correct += (preds == labels).sum().item()\n                eval_total += labels.size(0)\n                all_preds.extend(preds.cpu().tolist())\n                all_labels.extend(labels.cpu().tolist())\n                if cfg.mode == \"trial\" and step \u003e 1:\n                    break\n        eval_acc = eval_correct / max(1, eval_total)\n        eval_loss = eval_loss_total / max(1, eval_total)\n        metric_acc.add_batch(predictions=all_preds, references=all_labels)\n        acc_glue = metric_acc.compute()[\"accuracy\"]\n        mcc_glue = metric_mcc.compute(predictions=all_preds, references=all_labels)[\"matthews_correlation\"]\n\n        # Logging ---------------------------------------------------\n        if cfg.wandb.mode != \"disabled\":\n            wandb.log({\n                \"epoch\": epoch + 1,\n                \"train_loss\": train_loss,\n                \"train_acc\": train_acc,\n                \"eval_loss\": eval_loss,\n                \"eval_acc\": eval_acc,\n                \"glue_accuracy\": acc_glue,\n                \"glue_mcc\": mcc_glue,\n                \"lr\": lr_scheduler.get_last_lr()[0],\n            }, step=global_step)\n\n        if eval_acc \u003e best_eval_metric:\n            best_eval_metric = eval_acc\n\n    runtime = time.time() - start_time\n    summary_metrics = {\n        \"best_eval_acc\": best_eval_metric,\n        \"runtime_sec\": runtime,\n        \"params_trainable\": sum(p.numel() for p in model.parameters() if p.requires_grad),\n    }\n    if cfg.wandb.mode != \"disabled\":\n        for k, v in summary_metrics.items():\n            wandb.summary[k] = v\n    return summary_metrics\n\n\n# -------------------------------------------------------------\n#  Optuna Objective wrapper\n# -------------------------------------------------------------\n\ndef optuna_objective(trial: optuna.Trial, cfg_base):\n    cfg = OmegaConf.clone(cfg_base)\n\n    # Sample hyperparams according to search_space\n    for hp_name, hp_conf in cfg.optuna.search_space.items():\n        if hp_conf.type == \"loguniform\":\n            sampled = trial.suggest_float(hp_name, hp_conf.low, hp_conf.high, log=True)\n        elif hp_conf.type == \"uniform\":\n            sampled = trial.suggest_float(hp_name, hp_conf.low, hp_conf.high)\n        elif hp_conf.type == \"int\":\n            sampled = trial.suggest_int(hp_name, hp_conf.low, hp_conf.high, step=hp_conf.step)\n        elif hp_conf.type == \"categorical\":\n            sampled = trial.suggest_categorical(hp_name, hp_conf.choices)\n        else:\n            raise ValueError(f\"Unknown hp type {hp_conf.type}\")\n        # set nested attributes\n        if hp_name in cfg.training:\n            cfg.training[hp_name] = sampled\n        elif hp_name in cfg.fw_lora:\n            cfg.fw_lora[hp_name] = sampled\n        elif hp_name == \"lora_rank\":\n            cfg.model.lora.rank = int(sampled)\n        else:\n            cfg[hp_name] = sampled\n\n    # Short evaluation: train for 1 epoch only on subset\n    cfg.training.epochs = 1\n    cfg.mode = \"trial\"  # ensure fast path\n    cfg.wandb.mode = \"disabled\"\n\n    metrics = train_single_run(cfg)\n    return metrics[\"best_eval_acc\"]\n\n\n# -------------------------------------------------------------\n#  Hydra entry-point\n# -------------------------------------------------------------\n\n@hydra.main(config_path=\"../config\", config_name=\"config\", version_base=None)\ndef main(cfg):\n    \"\"\"Entry-point for a single training run. Handles Optuna then final training.\"\"\"\n    orig_cwd = hydra.utils.get_original_cwd()\n    run_cfg_path = os.path.join(orig_cwd, \"config\", \"runs\", f\"{cfg.run}.yaml\")\n    if not os.path.exists(run_cfg_path):\n        raise FileNotFoundError(f\"Run config not found: {run_cfg_path}\")\n\n    run_cfg = OmegaConf.load(run_cfg_path)\n    cfg = OmegaConf.merge(cfg, run_cfg)\n\n    # Mode override ------------------------------------------------\n    if cfg.mode == \"trial\":\n        cfg.wandb.mode = \"disabled\"\n        cfg.optuna.n_trials = 0\n        cfg.training.epochs = 1\n    else:\n        cfg.wandb.mode = \"online\"\n\n    # WandB init ---------------------------------------------------\n    if cfg.wandb.mode != \"disabled\":\n        wandb.init(\n            entity=cfg.wandb.entity,\n            project=cfg.wandb.project,\n            id=cfg.run_id,\n            config=OmegaConf.to_container(cfg, resolve=True),\n            resume=\"allow\",\n            mode=cfg.wandb.mode,\n        )\n        print(f\"WandB URL: {wandb.run.get_url()}\")\n\n    # ------------------ Optuna Hyperparameter Search -------------\n    best_params = {}\n    if cfg.optuna.n_trials and cfg.optuna.n_trials \u003e 0:\n        study = optuna.create_study(direction=cfg.optuna.direction)\n        study.optimize(lambda trial: optuna_objective(trial, cfg), n_trials=cfg.optuna.n_trials)\n        best_params = study.best_params\n        print(\"Optuna best params:\", best_params)\n        # Update cfg with best params\n        for k, v in best_params.items():\n            if k in cfg.training:\n                cfg.training[k] = v\n            elif k in cfg.fw_lora:\n                cfg.fw_lora[k] = v\n            elif k == \"lora_rank\":\n                cfg.model.lora.rank = int(v)\n            else:\n                cfg[k] = v\n\n    # ------------------ Final Training ---------------------------\n    metrics = train_single_run(cfg)\n    print(json.dumps(metrics, indent=2))\n\n    if cfg.wandb.mode != \"disabled\":\n        wandb.finish()\n\n\nif __name__ == \"__main__\":\n    main()\n"}
+
+Analyze the experiment code thoroughly. Ensure it is complete, executable, and ready for publication-quality research experiments.
+Output:
+{
+    "is_code_ready": false,
+    "code_issue": "The code will not run successfully in its current form and several Core Validation Criteria are violated:\n\n1. preprocess.py breaks the data pipeline (Core 3).\n   • It first removes *all* original columns (`remove_columns=train_ds.column_names`) and therefore deletes the `label` column before renaming it.  `rename_column(\"label\", \"labels\")` will raise a `KeyError` at run time.\n   • Because the label column is lost, the training loop will not receive `labels`, producing further crashes.\n\n2. Evaluation requirements are incomplete (Core 8).\n   • No confusion-matrix figures are generated and the unique file-naming convention is not fully respected.\n   • No statistical significance tests or derived metrics beyond a single two-run improvement ratio are produced.\n\n3. Hydration / mode logic gaps (Core 2 & 6).\n   • train.py initialises WandB *before* the automatic trial→disabled switch is guaranteed (the switch occurs in main.py but train.py can still be invoked directly by the user).  WandB must be disabled inside train.py itself when `cfg.mode==\"trial\"`.\n   • WandB metric names logged during training (`glue_accuracy`, `glue_mcc`) are **not** exactly the same as those looked-up in evaluate.py (`best_eval_acc`).  Mis-match breaks evaluation requirements.\n\n4. Minor but blocking issues.\n   • `load_metric` is deprecated; expected to move to `evaluate` package, yet the code still uses the old API without `pip install evaluate` in dependencies.\n   • evaluate.py contains a small syntax error in the type annotation line `def aggregate_metrics(run_summaries: Dict[str, Dict]) -\u0003e Dict[str, float]:` (the unicode escape will fail to parse).\n\nBecause of these problems the experiment code is **not ready for immediate execution**. Fix the data-pipeline bug, complete evaluation functionality, hard-guard WandB mode inside train.py, align metric names, and address the minor syntax/API issues."
+}
