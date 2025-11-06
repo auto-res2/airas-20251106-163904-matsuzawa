@@ -1,6 +1,7 @@
 import os
 import time
 import json
+import copy
 from collections import defaultdict
 from typing import Dict, Any, Tuple, List
 
@@ -235,7 +236,7 @@ def train_single_run(cfg) -> Dict[str, Any]:
 # -----------------------------------------------------------------------------
 
 def optuna_objective(trial: optuna.Trial, base_cfg):
-    cfg = OmegaConf.deepcopy(base_cfg)
+    cfg = copy.deepcopy(base_cfg)
     # Sample hyper-parameters as described in cfg.optuna.search_space
     for hp, hp_conf in cfg.optuna.search_space.items():
         if hp_conf.type == "loguniform":
