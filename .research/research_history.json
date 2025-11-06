@@ -122,6 +122,10 @@
       "expected_result": "FW-LoRA matches or slightly exceeds AdaLoRA with <1 % slower than vanilla LoRA (≈10–15 % faster than AdaLoRA).  Example SST-2 (0.2 % budget): LoRA 93.1, AdaLoRA 94.3, FW-LoRA 94.1.  CoLA (0.2 %): LoRA 55.0, AdaLoRA 57.8, FW-LoRA 57.5.  Training time: LoRA 1×, FW-LoRA 1.01×, AdaLoRA 1.12×.",
       "expected_conclusion": "A single Fisher-weighted shrinkage term lets the model focus its tiny LoRA budget on layers that actually influence the task, giving almost the entire accuracy gain of AdaLoRA but with the simplicity, speed and hyper-parameter-lightness of vanilla LoRA.  This shows that inexpensive first-order importance signals are sufficient for effective budget re-allocation during parameter-efficient fine-tuning."
     },
-    "iterations": []
+    "iterations": [
+      {
+        "method": "Fisher-Weighted LoRA (FW-LoRA) – add one line to the loss of a standard LoRA model.\n1. Warm-up phase (first K≈500 optimisation steps): run ordinary LoRA training and accumulate an exponential moving average of the squared gradient of the original pretrained weights:  F_m = EMA_t[ ||∇_t W_m||_F² ].  This is a cheap diagonal Fisher-information proxy per weight matrix m.\n2. After warm-up freeze the F_m values and compute a normalised importance score  I_m = F_m / Σ_m F_m.\n3. Add a Fisher-weighted L2 shrinkage term on every LoRA update matrix ΔW_m:\n   L_total = L_task  +  λ · Σ_m (1 − I_m) · ||ΔW_m||_F²\n   (λ≈1e-4).\nMatrices that rarely receive gradient signal (small I_m) are automatically pushed toward zero; those that matter are almost unaffected. No SVD, no rank scheduler, no extra forward/backward pass."
+      }
+    ]
   }
 }
