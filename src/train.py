@@ -315,7 +315,7 @@ def main(cfg):  # noqa: C901  complexity fine for research script
         for k, v in best_params.items():
             if k in cfg.training:
                 cfg.training[k] = v
-            elif k in cfg.fw_lora:
+            elif "fw_lora" in cfg and k in cfg.fw_lora:
                 cfg.fw_lora[k] = v
             elif k == "lora_rank":
                 cfg.model.lora.rank = int(v)
