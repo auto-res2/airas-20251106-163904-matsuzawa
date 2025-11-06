@@ -43,8 +43,8 @@ def build_datasets(cfg, tokenizer: PreTrainedTokenizerBase) -> Tuple[Dataset, Da
         return tokenised
 
     # Preserve the original label column but remove others we don't need
-    remove_cols_train = [c for c in train_ds.column_names if c not in {text_key, "label"}]
-    remove_cols_eval = [c for c in eval_ds.column_names if c not in {text_key, "label"}]
+    remove_cols_train = [c for c in train_ds.column_names if c not in {"label"}]
+    remove_cols_eval = [c for c in eval_ds.column_names if c not in {"label"}]
 
     train_ds = train_ds.map(tokenize_fn, batched=True, remove_columns=remove_cols_train)
     eval_ds = eval_ds.map(tokenize_fn, batched=True, remove_columns=remove_cols_eval)
