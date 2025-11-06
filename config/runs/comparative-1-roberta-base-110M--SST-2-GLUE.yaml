@@ -13,8 +13,7 @@ model:
       - query
       - key
       - value
-      - intermediate
-      - output
+      - dense
 dataset:
   name: glue
   subset: sst2
