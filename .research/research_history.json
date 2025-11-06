@@ -124,7 +124,46 @@
     },
     "iterations": [
       {
-        "method": "Fisher-Weighted LoRA (FW-LoRA) – add one line to the loss of a standard LoRA model.\n1. Warm-up phase (first K≈500 optimisation steps): run ordinary LoRA training and accumulate an exponential moving average of the squared gradient of the original pretrained weights:  F_m = EMA_t[ ||∇_t W_m||_F² ].  This is a cheap diagonal Fisher-information proxy per weight matrix m.\n2. After warm-up freeze the F_m values and compute a normalised importance score  I_m = F_m / Σ_m F_m.\n3. Add a Fisher-weighted L2 shrinkage term on every LoRA update matrix ΔW_m:\n   L_total = L_task  +  λ · Σ_m (1 − I_m) · ||ΔW_m||_F²\n   (λ≈1e-4).\nMatrices that rarely receive gradient signal (small I_m) are automatically pushed toward zero; those that matter are almost unaffected. No SVD, no rank scheduler, no extra forward/backward pass."
+        "method": "Fisher-Weighted LoRA (FW-LoRA) – add one line to the loss of a standard LoRA model.\n1. Warm-up phase (first K≈500 optimisation steps): run ordinary LoRA training and accumulate an exponential moving average of the squared gradient of the original pretrained weights:  F_m = EMA_t[ ||∇_t W_m||_F² ].  This is a cheap diagonal Fisher-information proxy per weight matrix m.\n2. After warm-up freeze the F_m values and compute a normalised importance score  I_m = F_m / Σ_m F_m.\n3. Add a Fisher-weighted L2 shrinkage term on every LoRA update matrix ΔW_m:\n   L_total = L_task  +  λ · Σ_m (1 − I_m) · ||ΔW_m||_F²\n   (λ≈1e-4).\nMatrices that rarely receive gradient signal (small I_m) are automatically pushed toward zero; those that matter are almost unaffected. No SVD, no rank scheduler, no extra forward/backward pass.",
+        "experimental_design": {
+          "experiment_summary": "The goal is to show that Fisher-Weighted LoRA (FW-LoRA) can concentrate a tiny parameter budget on the weight matrices that matter while being as fast and simple as vanilla LoRA and almost as accurate as AdaLoRA.  We fine-tune a single backbone model – “roberta-base (110 M params)” – on two standard GLUE classification tasks that are small enough to run in minutes on one A100/H200: SST-2 for sentiment analysis and CoLA for grammatical acceptability.  Three LoRA budgets are evaluated (0.1 %, 0.2 %, 0.5 % of the backbone’s parameters).  \n\nWorkflow\n1. Load the frozen HuggingFace roberta-base weights and insert standard LoRA adapters (query/key/value and both feed-forward projections) at a uniform initial rank r such that the total added parameters match the chosen budget.\n2. Warm-up phase (≈500 optimiser steps): ordinary cross-entropy training; meanwhile accumulate an exponential moving average of the squared gradient norm of every frozen weight matrix.  This yields per-matrix Fisher proxies F_m.\n3. Normalise once to importance scores I_m = F_m / Σ_m F_m.\n4. Continue training for the remaining steps/epochs with the modified loss\n     L_total = L_task + λ Σ_m (1−I_m)‖ΔW_m‖²\n   where λ is a single shrinkage coefficient (default 1e-4).\n   Matrices that rarely receive gradient signal (low I_m) are penalised and therefore their LoRA updates shrink towards zero, effectively reallocating the rank budget to important layers without SVD or custom schedulers.\n5. Evaluate after each epoch on the dev splits of SST-2 (Accuracy) and CoLA (Matthews Corr.).  Record wall-clock training time.\n6. Compare against two baselines trained with identical optimisation hyper-parameters: (a) plain LoRA with uniform rank, (b) AdaLoRA (public reference implementation with its default importance-metric SVD and rank scheduler).\n\nHardware fit: one GPU of the stated cluster is more than sufficient; peak memory << 24 GB.  Total run-time ≃15 min per setting.",
+          "evaluation_metrics": [
+            "Accuracy",
+            "Matthews Correlation",
+            "Wall-clock Training Time"
+          ],
+          "proposed_method": "Fisher-Weighted LoRA (FW-LoRA) is a drop-in replacement for ordinary LoRA fine-tuning that automatically down-weights update matrices belonging to unimportant backbone layers.\nTheoretical basis: for small parameter updates, the diagonal of the Fisher information approximates how much each weight influences the loss.  By accumulating an EMA of squared gradients during an initial warm-up we obtain cheap per-matrix Fisher proxies.  After normalisation we use (1−I_m) as a coefficient in an L2 penalty on each LoRA matrix ΔW_m.  High-Fisher (important) layers receive near-zero regularisation, low-Fisher layers are strongly shrunk, causing their effective rank to collapse while important layers keep their capacity – all without modifying the optimiser, adding extra passes, or running expensive SVDs like AdaLoRA.  The only new hyper-parameters are λ (regularisation scale) and the warm-up length K; defaults (1e-4, 500 steps) work well across tasks.",
+          "comparative_methods": [
+            "AdaLoRA"
+          ],
+          "models_to_use": [
+            "roberta-base (110M)"
+          ],
+          "datasets_to_use": [
+            "SST-2 (GLUE)"
+          ],
+          "hyperparameters_to_search": {
+            "learning_rate": "1e-4-3e-4",
+            "lambda_fw": "5e-5-5e-4",
+            "lora_rank": "4,8,16",
+            "warmup_steps": "300,500,800",
+            "batch_size": "16,32,64"
+          }
+        },
+        "experiment_runs": [
+          {
+            "run_id": "proposed-roberta-base-110M--SST-2-GLUE",
+            "method_name": "proposed",
+            "model_name": "roberta-base (110M)",
+            "dataset_name": "SST-2 (GLUE)"
+          },
+          {
+            "run_id": "comparative-1-roberta-base-110M--SST-2-GLUE",
+            "method_name": "comparative-1",
+            "model_name": "roberta-base (110M)",
+            "dataset_name": "SST-2 (GLUE)"
+          }
+        ]
       }
     ]
   }
