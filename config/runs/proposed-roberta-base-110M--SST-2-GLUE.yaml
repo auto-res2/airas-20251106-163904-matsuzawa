@@ -14,7 +14,7 @@ model:
       - key
       - value
       - intermediate
-      - output
+      - output.dense
 dataset:
   name: glue
   subset: sst2
