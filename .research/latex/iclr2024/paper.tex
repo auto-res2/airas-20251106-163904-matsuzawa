@@ -52,9 +52,9 @@ We introduce Fisher-Weighted LoRA (FW-LoRA), a minimalist modification to low-ra
 
 \section{Introduction}
 \label{sec:intro}
-Large language models have become the foundation of contemporary natural-language processing, yet full fine-tuning remains prohibitively expensive when many downstream tasks must be supported. Parameter-efficient fine-tuning (PEFT) mitigates this cost by introducing a small number of trainable parameters while keeping the large pretrained backbone frozen \cite{chen-2023-parameter}. Among the many PEFT strategies, low-rank adaptation (LoRA) is attractive because it injects learnable matrices directly into the weight space and imposes negligible inference overhead. A persistent limitation, however, is that almost all LoRA recipes allocate the same rank to every modified layer, implicitly assuming that each layer contributes equally. Empirical evidence shows that this is rarely the case; mis-allocation is especially harmful when the adapter budget drops below one percent of the backbone size.
+Large language models have become the foundation of contemporary natural-language processing, yet full fine-tuning remains prohibitively expensive when many downstream tasks must be supported. Parameter-efficient fine-tuning (PEFT) mitigates this cost by introducing a small number of trainable parameters while keeping the large pretrained backbone frozen~\cite{chen-2023-parameter}. Among the many PEFT strategies, low-rank adaptation (LoRA) is attractive because it injects learnable matrices directly into the weight space and imposes negligible inference overhead. A persistent limitation, however, is that almost all LoRA recipes allocate the same rank to every modified layer, implicitly assuming that each layer contributes equally. Empirical evidence shows that this is rarely the case; mis-allocation is especially harmful when the adapter budget drops below one percent of the backbone size.
 
-Adaptive methods such as AdaLoRA tackle this problem by estimating layer importance and dynamically pruning singular values during training, thereby reallocating rank where it is most needed \cite{zhang-2023-adaptive}. Although effective, these techniques incur additional memory for temporary SVD buffers, extra compute for repeated decompositions, and intricate scheduling logic-obstacles for quick experimentation or resource-constrained deployment.
+Adaptive methods such as AdaLoRA tackle this problem by estimating layer importance and dynamically pruning singular values during training, thereby reallocating rank where it is most needed~\cite{zhang-2023-adaptive}. Although effective, these techniques incur additional memory for temporary SVD buffers, extra compute for repeated decompositions, and intricate scheduling logic-obstacles for quick experimentation or resource-constrained deployment.
 
 This work asks a simple question: can we approximate the benefits of adaptive rank allocation with the simplicity and speed of vanilla LoRA? We answer in the affirmative by proposing Fisher-Weighted LoRA (FW-LoRA). The key insight is that the gradients of the frozen backbone, already computed during ordinary training, contain rich information about which weight matrices influence the task loss. By accumulating an exponential moving average of their squared norm for a few hundred optimisation steps we obtain a stable, diagonal Fisher-information proxy per matrix. Normalising these values yields per-matrix importance scores that remain fixed for the rest of training. A single additional term-an L2 penalty weighted by $(1 - \text{importance})$-then biases the optimiser to devote its limited LoRA capacity to the influential matrices.
 
@@ -70,17 +70,17 @@ How do we verify the claim? We fine-tune the 110 M-parameter roberta-base model 
   \item \textbf{Open-source artefacts:} Open-source artefacts (metrics, figures, significance tests) enabling full reproducibility.
 \end{itemize}
 
-The remainder of the paper is organised as follows. Section 2 situates FW-LoRA within existing PEFT literature. Section 3 reviews the necessary background and notation. Section 4 details the method. Section 5 describes the experimental setup. Section 6 reports results and analyses. Section 7 concludes and outlines future work, including broader task coverage, statistical robustness, and integration with robustness-oriented PEFT ideas \cite{yang-2022-robust,petrov-2023-when}.
+The remainder of the paper is organised as follows. Section 2 situates FW-LoRA within existing PEFT literature. Section 3 reviews the necessary background and notation. Section 4 details the method. Section 5 describes the experimental setup. Section 6 reports results and analyses. Section 7 concludes and outlines future work, including broader task coverage, statistical robustness, and integration with robustness-oriented PEFT ideas~\cite{yang-2022-robust,petrov-2023-when}.
 
 \section{Related Work}
 \label{sec:related}
-PEFT can be framed as a design space defined by layer grouping, parameter allocation, tunable groups, and adaptation strategy \cite{chen-2023-parameter}. FW-LoRA operates exclusively in the allocation dimension: it keeps the LoRA parameterisation intact yet redistributes the effective capacity by means of a Fisher-weighted penalty.
+PEFT can be framed as a design space defined by layer grouping, parameter allocation, tunable groups, and adaptation strategy~\cite{chen-2023-parameter}. FW-LoRA operates exclusively in the allocation dimension: it keeps the LoRA parameterisation intact yet redistributes the effective capacity by means of a Fisher-weighted penalty.
 
-Uniform-rank LoRA remains the de-facto baseline owing to its ease of use, but its equal allocation disregards inter-layer heterogeneity. AdaLoRA extends LoRA with dynamic singular-value pruning and a rank scheduler that reallocates parameters during training, achieving strong gains at small budgets \cite{zhang-2023-adaptive}. The price is a per-step SVD, additional memory, and hyper-parameters that govern the scheduler. FW-LoRA seeks the same goal using first-order information already present in the training loop, shifting complexity from expensive matrix decompositions to a static regulariser.
+Uniform-rank LoRA remains the de-facto baseline owing to its ease of use, but its equal allocation disregards inter-layer heterogeneity. AdaLoRA extends LoRA with dynamic singular-value pruning and a rank scheduler that reallocates parameters during training, achieving strong gains at small budgets~\cite{zhang-2023-adaptive}. The price is a per-step SVD, additional memory, and hyper-parameters that govern the scheduler. FW-LoRA seeks the same goal using first-order information already present in the training loop, shifting complexity from expensive matrix decompositions to a static regulariser.
 
-Prefix-tuning and prompt-tuning operate in activation space rather than weight space, yielding strong modularity but limited ability to alter internal attention patterns \cite{petrov-2023-when}. Robust variants add task-specific prefixes to defend against adversarial perturbations \cite{yang-2022-robust}. These approaches are complementary to ours: FW-LoRA targets weight-space capacity allocation and can in principle be combined with activation-space methods.
+Prefix-tuning and prompt-tuning operate in activation space rather than weight space, yielding strong modularity but limited ability to alter internal attention patterns~\cite{petrov-2023-when}. Robust variants add task-specific prefixes to defend against adversarial perturbations~\cite{yang-2022-robust}. These approaches are complementary to ours: FW-LoRA targets weight-space capacity allocation and can in principle be combined with activation-space methods.
 
-Finally, layer normalisation stabilises gradient statistics in transformers and therefore indirectly affects the Fisher signals exploited by FW-LoRA \cite{ba-2016-layer}. We inherit the pretrained normalisation parameters unchanged.
+Finally, layer normalisation stabilises gradient statistics in transformers and therefore indirectly affects the Fisher signals exploited by FW-LoRA~\cite{ba-2016-layer}. We inherit the pretrained normalisation parameters unchanged.
 
 In summary, FW-LoRA delivers AdaLoRA-like importance awareness at plain-LoRA cost, filling a gap between uniform allocation and heavy adaptive schemes.
 
@@ -98,7 +98,7 @@ L_{total} = L_{task} + \lambda \sum_m (1 - I_m) \, \lVert \Delta W_m \rVert_F^2,
 \]
 where $\lambda$ is a global shrinkage coefficient. The term $(1 - I_m)$ scales the penalty: adapters attached to unimportant matrices (small $I_m$) are heavily regularised; those on important matrices are almost free. Crucially, no SVD, rank pruning, or discrete scheduling is required. The method assumes (i) early gradients reflect long-term importance and (ii) a diagonal proxy suffices for allocation-assumptions validated empirically in Section 6.
 
-The overall algorithm therefore inserts three lightweight operations into a standard LoRA loop and leaves all structural PEFT choices untouched \cite{chen-2023-parameter}.
+The overall algorithm therefore inserts three lightweight operations into a standard LoRA loop and leaves all structural PEFT choices untouched~\cite{chen-2023-parameter}.
 
 \section{Method}
 \label{sec:method}
@@ -114,7 +114,7 @@ FW-LoRA proceeds in three sequential phases.
 In all experiments we fix $K = 500$ steps, $\alpha = 0.98$, and $\lambda = 1 \times 10^{-4}$. A small study (\S6) shows that performance is insensitive to these values within reasonable ranges.
 
 \subsection{Complexity and memory}
-The warm-up adds one scalar update per matrix per step; the Fisher term adds a per-matrix scaling during back-propagation. Both costs are negligible compared with a full SVD required by AdaLoRA \cite{zhang-2023-adaptive}. Memory footprint equals that of plain LoRA plus one float per matrix to store $I_m$.
+The warm-up adds one scalar update per matrix per step; the Fisher term adds a per-matrix scaling during back-propagation. Both costs are negligible compared with a full SVD required by AdaLoRA~\cite{zhang-2023-adaptive}. Memory footprint equals that of plain LoRA plus one float per matrix to store $I_m$.
 
 \begin{algorithm}[H]
 \caption{FW-LoRA training procedure}
@@ -127,10 +127,10 @@ The warm-up adds one scalar update per matrix per step; the Fisher term adds a p
       \State $F_m \leftarrow \alpha F_m + (1-\alpha)\, \lVert \nabla_t W_m \rVert_F^2$ for all $m$
     \ElsIf{$t = K+1$}
       \State $I_m \leftarrow F_m / \sum_k F_k$ for all $m$; freeze $I_m$
-    \EndIf
+    \EndIf%
     \State Compute $L_{reg} \leftarrow \lambda \sum_m (1 - I_m)\, \lVert \Delta W_m \rVert_F^2$ (use $I_m = 0$ during warm-up)
     \State Update adapters using gradients of $L_{task} + L_{reg}$ (backbone $\{W_m\}$ remain frozen)
-  \EndFor
+  \EndFor%
 \end{algorithmic}
 \end{algorithm}
 
@@ -168,73 +168,73 @@ We present all logged results for the SST-2 task. Higher accuracy and lower loss
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.7\linewidth]{ images/proposed-roberta-base-110M--SST-2-GLUE\_confusion\_matrix.pdf }
+  \includegraphics[width=0.7\linewidth]{images/proposed-roberta-base-110M--SST-2-GLUE_confusion_matrix.pdf}
   \caption{Validation confusion matrix, FW-LoRA (higher diagonal is better).}
 \end{figure}
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.7\linewidth]{ images/proposed-roberta-base-110M--SST-2-GLUE\_eval\_acc\_learning\_curve.pdf }
+  \includegraphics[width=0.7\linewidth]{images/proposed-roberta-base-110M--SST-2-GLUE_eval_acc_learning_curve.pdf}
   \caption{Validation accuracy curve, FW-LoRA (higher is better).}
 \end{figure}
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.7\linewidth]{ images/proposed-roberta-base-110M--SST-2-GLUE\_glue\_accuracy\_learning\_curve.pdf }
+  \includegraphics[width=0.7\linewidth]{images/proposed-roberta-base-110M--SST-2-GLUE_glue_accuracy_learning_curve.pdf}
   \caption{GLUE accuracy curve, FW-LoRA (higher is better).}
 \end{figure}
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.7\linewidth]{ images/proposed-roberta-base-110M--SST-2-GLUE\_train\_loss\_learning\_curve.pdf }
+  \includegraphics[width=0.7\linewidth]{images/proposed-roberta-base-110M--SST-2-GLUE_train_loss_learning_curve.pdf}
   \caption{Training loss curve, FW-LoRA (lower is better).}
 \end{figure}
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.7\linewidth]{ images/comparative-1-roberta-base-110M--SST-2-GLUE\_confusion\_matrix.pdf }
+  \includegraphics[width=0.7\linewidth]{images/comparative-1-roberta-base-110M--SST-2-GLUE_confusion_matrix.pdf}
   \caption{Validation confusion matrix, plain LoRA (higher diagonal is better).}
 \end{figure}
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.7\linewidth]{ images/comparative-1-roberta-base-110M--SST-2-GLUE\_eval\_acc\_learning\_curve.pdf }
+  \includegraphics[width=0.7\linewidth]{images/comparative-1-roberta-base-110M--SST-2-GLUE_eval_acc_learning_curve.pdf}
   \caption{Validation accuracy curve, plain LoRA (higher is better).}
 \end{figure}
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.7\linewidth]{ images/comparative-1-roberta-base-110M--SST-2-GLUE\_glue\_accuracy\_learning\_curve.pdf }
+  \includegraphics[width=0.7\linewidth]{images/comparative-1-roberta-base-110M--SST-2-GLUE_glue_accuracy_learning_curve.pdf}
   \caption{GLUE accuracy curve, plain LoRA (higher is better).}
 \end{figure}
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.7\linewidth]{ images/comparative-1-roberta-base-110M--SST-2-GLUE\_train\_loss\_learning\_curve.pdf }
+  \includegraphics[width=0.7\linewidth]{images/comparative-1-roberta-base-110M--SST-2-GLUE_train_loss_learning_curve.pdf}
   \caption{Training loss curve, plain LoRA (lower is better).}
 \end{figure}
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.7\linewidth]{ images/comparison\_best\_eval\_acc\_bar\_chart.pdf }
+  \includegraphics[width=0.7\linewidth]{images/comparison_best_eval_acc_bar_chart.pdf}
   \caption{Bar chart of best validation accuracy (higher is better).}
 \end{figure}
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.7\linewidth]{ images/comparison\_runtime\_sec\_bar\_chart.pdf }
+  \includegraphics[width=0.7\linewidth]{images/comparison_runtime_sec_bar_chart.pdf}
   \caption{Bar chart of runtime in seconds (lower is better).}
 \end{figure}
 
-\textit{Discussion.} Although the absolute gain (+0.23 pp) is modest, it is achieved with a single line of code and no hyper-parameter tuning beyond defaults. The baseline-to-FW-LoRA improvement mirrors trends reported by AdaLoRA on similar tasks and budgets \cite{zhang-2023-adaptive}, suggesting that first-order Fisher information is a viable surrogate for more elaborate importance metrics.
+\textit{Discussion.} Although the absolute gain (+0.23 pp) is modest, it is achieved with a single line of code and no hyper-parameter tuning beyond defaults. The baseline-to-FW-LoRA improvement mirrors trends reported by AdaLoRA on similar tasks and budgets~\cite{zhang-2023-adaptive}, suggesting that first-order Fisher information is a viable surrogate for more elaborate importance metrics.
 
 \textit{Limitations.} Results are single-seed and limited to one task in depth; CoLA logs are omitted due to space. The runtime analysis is confounded by different target layers. Statistical significance is therefore suggestive rather than definitive. Nevertheless, the present evidence supports the central claim that importance-aware regularisation can be obtained almost for free.
 
 \section{Conclusion}
 \label{sec:conclusion}
-We presented Fisher-Weighted LoRA, an importance-aware extension of low-rank adaptation that requires only a brief gradient accumulation phase and a single Fisher-weighted L2 term. The method captures layer importance via a cheap diagonal Fisher proxy, reallocates adapter capacity implicitly, and improves validation accuracy on SST-2 over uniform-rank LoRA with negligible theoretical overhead. By avoiding the computational burdens of adaptive SVD-based schemes such as AdaLoRA \cite{zhang-2023-adaptive}, FW-LoRA offers a practical default for resource-constrained settings.
+We presented Fisher-Weighted LoRA, an importance-aware extension of low-rank adaptation that requires only a brief gradient accumulation phase and a single Fisher-weighted L2 term. The method captures layer importance via a cheap diagonal Fisher proxy, reallocates adapter capacity implicitly, and improves validation accuracy on SST-2 over uniform-rank LoRA with negligible theoretical overhead. By avoiding the computational burdens of adaptive SVD-based schemes such as AdaLoRA~\cite{zhang-2023-adaptive}, FW-LoRA offers a practical default for resource-constrained settings.
 
-Future directions include: (i) systematic comparisons with AdaLoRA under matched layer selections and multiple random seeds; (ii) broader evaluations across GLUE and non-classification tasks; (iii) integration with robustness-oriented PEFT frameworks \cite{yang-2022-robust}; and (iv) exploration of adaptive shrinkage schedules that update importance on-the-fly. We hope that the simplicity of FW-LoRA will lower the barrier to importance-aware PEFT and spur adoption in real-world fine-tuning pipelines.
+Future directions include: (i) systematic comparisons with AdaLoRA under matched layer selections and multiple random seeds; (ii) broader evaluations across GLUE and non-classification tasks; (iii) integration with robustness-oriented PEFT frameworks~\cite{yang-2022-robust}; and (iv) exploration of adaptive shrinkage schedules that update importance on-the-fly. We hope that the simplicity of FW-LoRA will lower the barrier to importance-aware PEFT and spur adoption in real-world fine-tuning pipelines.
 
 This work was generated by \textsc{AIRAS} \citep{airas2025}.
 

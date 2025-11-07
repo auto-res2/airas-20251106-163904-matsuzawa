@@ -1,0 +1,44 @@
+\begin{thebibliography}{6}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Ba et~al.(2016)Ba, Kiros, and Hinton]{ba-2016-layer}
+Jimmy~Lei Ba, Jamie~Ryan Kiros, and Geoffrey~E. Hinton.
+\newblock Layer normalization.
+\newblock 2016.
+
+\bibitem[Chen et~al.(2023)Chen, Zhang, Shi, Li, Smola, and
+  Yang]{chen-2023-parameter}
+Jiaao Chen, Aston Zhang, Xingjian Shi, Mu~Li, Alex Smola, and Diyi Yang.
+\newblock Parameter-efficient fine-tuning design spaces.
+\newblock 2023.
+
+\bibitem[Petrov et~al.(2023)Petrov, Torr, and Bibi]{petrov-2023-when}
+Aleksandar Petrov, Philip H.~S. Torr, and Adel Bibi.
+\newblock When do prompting and prefix-tuning work? a theory of capabilities
+  and limitations.
+\newblock 2023.
+
+\bibitem[Tanaka et~al.(2025)Tanaka, Matsuzawa, Yoshino, Horiguchi, Takagi,
+  Yamauchi, and Kumagai]{airas2025}
+Toma Tanaka, Takumi Matsuzawa, Yuki Yoshino, Ilya Horiguchi, Shiro Takagi,
+  Ryutaro Yamauchi, and Wataru Kumagai.
+\newblock {AIRAS}, 2025.
+\newblock URL \url{https://github.com/airas-org/airas}.
+
+\bibitem[Yang \& Liu(2022)Yang and Liu]{yang-2022-robust}
+Zonghan Yang and Yang Liu.
+\newblock On robust prefix-tuning for text classification.
+\newblock 2022.
+
+\bibitem[Zhang et~al.(2023)Zhang, Chen, Bukharin, Karampatziakis, He, Cheng,
+  Chen, and Zhao]{zhang-2023-adaptive}
+Qingru Zhang, Minshuo Chen, Alexander Bukharin, Nikos Karampatziakis, Pengcheng
+  He, Yu~Cheng, Weizhu Chen, and Tuo Zhao.
+\newblock Adaptive budget allocation for parameter-efficient fine-tuning.
+\newblock 2023.
+
+\end{thebibliography}

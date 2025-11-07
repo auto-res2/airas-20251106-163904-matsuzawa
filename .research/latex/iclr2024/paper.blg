@@ -1,0 +1,52 @@
+This is BibTeX, Version 0.99d (TeX Live 2023/Debian)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: paper.aux
+The style file: iclr2024_conference.bst
+Database file #1: references.bib
+Warning--empty journal in ba-2016-layer
+Warning--empty journal in chen-2023-parameter
+Warning--empty journal in petrov-2023-when
+Warning--empty journal in yang-2022-robust
+Warning--empty journal in zhang-2023-adaptive
+You've used 6 entries,
+            2773 wiz_defined-function locations,
+            617 strings with 5731 characters,
+and the built_in function-call counts, 3055 in all, are:
+= -- 233
+> -- 279
+< -- 1
++ -- 93
+- -- 87
+* -- 268
+:= -- 502
+add.period$ -- 18
+call.type$ -- 6
+change.case$ -- 47
+chr.to.int$ -- 6
+cite$ -- 17
+duplicate$ -- 115
+empty$ -- 188
+format.name$ -- 95
+if$ -- 602
+int.to.chr$ -- 1
+int.to.str$ -- 1
+missing$ -- 5
+newline$ -- 38
+num.names$ -- 24
+pop$ -- 106
+preamble$ -- 1
+purify$ -- 41
+quote$ -- 0
+skip$ -- 105
+stack$ -- 0
+substring$ -- 12
+swap$ -- 1
+text.length$ -- 0
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 66
+warning$ -- 5
+while$ -- 18
+width$ -- 0
+write$ -- 74
+(There were 5 warnings)
