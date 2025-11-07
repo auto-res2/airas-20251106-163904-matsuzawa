@@ -5,3 +5,146 @@
   publisher = {GitHub},
   url       = {https://github.com/airas-org/airas}
 }
+
+% ===========================================
+% REQUIRED CITATIONS
+% These papers must be cited in the manuscript
+% ===========================================
+
+@article{chen-2023-parameter,
+ abstract = {Parameter-efficient fine-tuning aims to achieve performance comparable to
+fine-tuning, using fewer trainable parameters. Several strategies (e.g.,
+Adapters, prefix tuning, BitFit, and LoRA) have been proposed. However, their
+designs are hand-crafted separately, and it remains unclear whether certain
+design patterns exist for parameter-efficient fine-tuning. Thus, we present a
+parameter-efficient fine-tuning design paradigm and discover design patterns
+that are applicable to different experimental settings. Instead of focusing on
+designing another individual tuning strategy, we introduce parameter-efficient
+fine-tuning design spaces that parameterize tuning structures and tuning
+strategies. Specifically, any design space is characterized by four components:
+layer grouping, trainable parameter allocation, tunable groups, and strategy
+assignment. Starting from an initial design space, we progressively refine the
+space based on the model quality of each design choice and make greedy
+selection at each stage over these four components. We discover the following
+design patterns: (i) group layers in a spindle pattern; (ii) allocate the
+number of trainable parameters to layers uniformly; (iii) tune all the groups;
+(iv) assign proper tuning strategies to different groups. These design patterns
+result in new parameter-efficient fine-tuning methods. We show experimentally
+that these methods consistently and significantly outperform investigated
+parameter-efficient fine-tuning strategies across different backbone models and
+different tasks in natural language processing.},
+ arxiv_url = {https://arxiv.org/pdf/2301.01821v1.pdf},
+ author = {Jiaao Chen and Aston Zhang and Xingjian Shi and Mu Li and Alex Smola and Diyi Yang},
+ github_url = {https://github.com/amazon-science/peft-design-spaces},
+ title = {Parameter-Efficient Fine-Tuning Design Spaces},
+ year = {2023}
+}
+
+@article{petrov-2023-when,
+ abstract = {Context-based fine-tuning methods, including prompting, in-context learning,
+soft prompting (also known as prompt tuning), and prefix-tuning, have gained
+popularity due to their ability to often match the performance of full
+fine-tuning with a fraction of the parameters. Despite their empirical
+successes, there is little theoretical understanding of how these techniques
+influence the internal computation of the model and their expressiveness
+limitations. We show that despite the continuous embedding space being more
+expressive than the discrete token space, soft-prompting and prefix-tuning are
+potentially less expressive than full fine-tuning, even with the same number of
+learnable parameters. Concretely, context-based fine-tuning cannot change the
+relative attention pattern over the content and can only bias the outputs of an
+attention layer in a fixed direction. This suggests that while techniques like
+prompting, in-context learning, soft prompting, and prefix-tuning can
+effectively elicit skills present in the pretrained model, they may not be able
+to learn novel tasks that require new attention patterns.},
+ arxiv_url = {https://arxiv.org/pdf/2310.19698v2.pdf},
+ author = {Aleksandar Petrov and Philip H. S. Torr and Adel Bibi},
+ title = {When Do Prompting and Prefix-Tuning Work? A Theory of Capabilities and Limitations},
+ year = {2023}
+}
+
+@article{yang-2022-robust,
+ abstract = {Recently, prefix-tuning has gained increasing attention as a
+parameter-efficient finetuning method for large-scale pretrained language
+models. The method keeps the pretrained models fixed and only updates the
+prefix token parameters for each downstream task. Despite being lightweight and
+modular, prefix-tuning still lacks robustness to textual adversarial attacks.
+However, most currently developed defense techniques necessitate auxiliary
+model update and storage, which inevitably hamper the modularity and low
+storage of prefix-tuning. In this work, we propose a robust prefix-tuning
+framework that preserves the efficiency and modularity of prefix-tuning. The
+core idea of our framework is leveraging the layerwise activations of the
+language model by correctly-classified training data as the standard for
+additional prefix finetuning. During the test phase, an extra batch-level
+prefix is tuned for each batch and added to the original prefix for robustness
+enhancement. Extensive experiments on three text classification benchmarks show
+that our framework substantially improves robustness over several strong
+baselines against five textual attacks of different types while maintaining
+comparable accuracy on clean texts. We also interpret our robust prefix-tuning
+framework from the optimal control perspective and pose several directions for
+future research.},
+ arxiv_url = {https://arxiv.org/pdf/2203.10378v1.pdf},
+ author = {Zonghan Yang and Yang Liu},
+ github_url = {https://github.com/minicheshire/Robust-Prefix-Tuning},
+ title = {On Robust Prefix-Tuning for Text Classification},
+ year = {2022}
+}
+
+@article{zhang-2023-adaptive,
+ abstract = {Fine-tuning large pre-trained language models on downstream tasks has become
+an important paradigm in NLP. However, common practice fine-tunes all of the
+parameters in a pre-trained model, which becomes prohibitive when a large
+number of downstream tasks are present. Therefore, many fine-tuning methods are
+proposed to learn incremental updates of pre-trained weights in a parameter
+efficient way, e.g., low-rank increments. These methods often evenly distribute
+the budget of incremental updates across all pre-trained weight matrices, and
+overlook the varying importance of different weight parameters. As a
+consequence, the fine-tuning performance is suboptimal. To bridge this gap, we
+propose AdaLoRA, which adaptively allocates the parameter budget among weight
+matrices according to their importance score. In particular, AdaLoRA
+parameterizes the incremental updates in the form of singular value
+decomposition. Such a novel approach allows us to effectively prune the
+singular values of unimportant updates, which is essentially to reduce their
+parameter budget but circumvent intensive exact SVD computations. We conduct
+extensive experiments with several pre-trained models on natural language
+processing, question answering, and natural language generation to validate the
+effectiveness of AdaLoRA. Results demonstrate that AdaLoRA manifests notable
+improvement over baselines, especially in the low budget settings. Our code is
+publicly available at https://github.com/QingruZhang/AdaLoRA .},
+ arxiv_url = {https://arxiv.org/pdf/2303.10512v2.pdf},
+ author = {Qingru Zhang and Minshuo Chen and Alexander Bukharin and Nikos Karampatziakis and Pengcheng He and Yu Cheng and Weizhu Chen and Tuo Zhao},
+ github_url = {https://github.com/microsoft/LoRA},
+ title = {Adaptive Budget Allocation for Parameter-Efficient Fine-Tuning },
+ year = {2023}
+}
+
+% ===========================================
+% REFERENCE CANDIDATES
+% Additional reference papers for context
+% ===========================================
+
+@article{ba-2016-layer,
+ abstract = {Training state-of-the-art, deep neural networks is computationally expensive.
+One way to reduce the training time is to normalize the activities of the
+neurons. A recently introduced technique called batch normalization uses the
+distribution of the summed input to a neuron over a mini-batch of training
+cases to compute a mean and variance which are then used to normalize the
+summed input to that neuron on each training case. This significantly reduces
+the training time in feed-forward neural networks. However, the effect of batch
+normalization is dependent on the mini-batch size and it is not obvious how to
+apply it to recurrent neural networks. In this paper, we transpose batch
+normalization into layer normalization by computing the mean and variance used
+for normalization from all of the summed inputs to the neurons in a layer on a
+single training case. Like batch normalization, we also give each neuron its
+own adaptive bias and gain which are applied after the normalization but before
+the non-linearity. Unlike batch normalization, layer normalization performs
+exactly the same computation at training and test times. It is also
+straightforward to apply to recurrent neural networks by computing the
+normalization statistics separately at each time step. Layer normalization is
+very effective at stabilizing the hidden state dynamics in recurrent networks.
+Empirically, we show that layer normalization can substantially reduce the
+training time compared with previously published techniques.},
+ arxiv_url = {https://arxiv.org/pdf/1607.06450v1.pdf},
+ author = {Jimmy Lei Ba and Jamie Ryan Kiros and Geoffrey E. Hinton},
+ title = {Layer normalization},
+ year = {2016}
+}
