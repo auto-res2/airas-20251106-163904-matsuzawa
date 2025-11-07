@@ -1,0 +1,10 @@
+{
+  "best_eval_acc": {
+    "proposed-roberta-base-110M--SST-2-GLUE": 0.9392201834862384,
+    "comparative-1-roberta-base-110M--SST-2-GLUE": 0.9369266055045872
+  },
+  "runtime_sec": {
+    "proposed-roberta-base-110M--SST-2-GLUE": 978.85835814476,
+    "comparative-1-roberta-base-110M--SST-2-GLUE": 586.3407661914825
+  }
+}
