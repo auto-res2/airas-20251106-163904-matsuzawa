@@ -113,6 +113,11 @@
       }
     }
   ],
+  "reference_research_study_list": [
+    {
+      "title": "Layer normalization"
+    }
+  ],
   "research_session": {
     "hypothesis": {
       "open_problems": "AdaLoRA shows that giving every weight matrix the same LoRA rank is wasteful, but its importance metric needs SVD on every step, several hand-tuned hyper-parameters and ≈10–20 % extra run-time. A simpler, cheaper way to bias the parameter budget toward truly useful layers is still missing.",
