@@ -133,6 +133,7 @@ jobs:
           name: trial-results-${{ github.run.id }}-${{ env.RUN_ID }}
           path: ${{ env.RESULTS_DIR }}
 
+
   fix-and-rerun:
     name: Fix and Re-run Trial
     needs: [setup, run-trial-experiment]
@@ -197,7 +198,9 @@ jobs:
           
           cat "$RESULTS_DIR/error_summary.txt"
 
-      - name: Claude Code Autonomous Run, Fix, and Validate Loop
+      - name: Run Claude Code
+        timeout-minutes: 10
+        continue-on-error: true
         uses: anthropics/claude-code-action@v1
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -222,7 +225,7 @@ jobs:
               sleep $((2**i))
             done
           else
-            echo "OpenCode made no changes to the code."
+            echo "Claude Code made no changes to the code."
           fi
 
       - name: Trigger next iteration
@@ -235,6 +238,7 @@ jobs:
             -f model_name='${{ github.event.inputs.model_name }}'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
   trigger-next-run:
     name: Trigger Next Run in Sequence
