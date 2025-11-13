@@ -159,7 +159,9 @@ jobs:
           
           cat "$RESULTS_DIR/error_summary.txt"
 
-      - name: Claude Code Autonomous Run, Fix, and Validate Loop
+      - name: Run Claude Code
+        timeout-minutes: 10
+        continue-on-error: true
         uses: anthropics/claude-code-action@v1
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -184,7 +186,7 @@ jobs:
               sleep $((2**i))
             done
           else
-            echo "OpenCode made no changes to the code."
+            echo "Claude Code made no changes to the code."
           fi
 
       - name: Trigger next iteration
