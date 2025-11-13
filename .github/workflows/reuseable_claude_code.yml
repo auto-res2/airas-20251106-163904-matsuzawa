@@ -1,0 +1,52 @@
+name: Reusable - Claude Code
+
+on:
+  workflow_call:
+    inputs:
+      prompt:
+        description: "The main prompt for the Claude code."
+        required: true
+        type: string
+      working-directory:
+        description: "The directory where the agent should run its commands."
+        required: false
+        type: string
+        default: '.'
+      claude_args:
+        description: "Additional arguments to pass to the claude-code-action."
+        required: false
+        type: string
+        default: "--max-turns=100 --allowed-tools Bash,Write,Edit,MultiEdit,TodoWrite"
+    secrets:
+      ANTHROPIC_API_KEY:
+        required: true
+
+jobs:
+  run-claude-code:
+    name: Run Claude Code
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+
+    steps:
+      - name: Download workspace from caller
+        uses: actions/download-artifact@v4
+        with:
+          name: workspace-${{ github.run_id }}
+
+      - name: Run Claude Code Action
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: ${{ inputs.prompt }}
+          claude_args: ${{ inputs.claude_args }}
+
+      - name: Upload workspace for the next job
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-${{ github.run_id }}
+          path: .
+          if-no-files-found: error
