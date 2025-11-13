@@ -92,7 +92,7 @@ jobs:
           echo "Image copy completed. Files in images/:"
           ls -la "${LATEX_DIR}/images/" || echo "No images found"
 
-      - name: Upload prepard workspace
+      - name: Upload prepared workspace
         uses: actions/upload-artifact@v4
         with:
           name: workspace-${{ github.run_id }}
@@ -129,6 +129,7 @@ jobs:
 
   finalize:
     name: Commit and Push PDF
+    runs-on: ubuntu-latest
     needs: [claude-code-1, claude-code-2, claude-code-3]
     if: >-
       !cancelled() && (
