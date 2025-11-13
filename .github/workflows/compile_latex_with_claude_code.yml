@@ -18,44 +18,44 @@ defaults:
   run:
     shell: bash
 
-env:
-  LATEX_DIR: .research/latex/${{ github.event.inputs.subdir }}
-  CHKTEX_COMMAND: |
-    set -e
-    echo "=== [PHASE 1/2] Running ChkTeX... ==="
-    chktex -q paper.tex
-  COMPILE_COMMAND: |
-    set -e
-    echo "=== [PHASE 2/2] Compiling LaTeX document... ==="
-    pdflatex -interaction=nonstopmode paper.tex
-    bibtex paper
-    pdflatex -interaction=nonstopmode paper.tex
-    pdflatex -interaction=nonstopmode paper.tex
-  PROMPT: |
-    You are a fully autonomous AI assistant specializing in LaTeX document correction.
-    Your task is to ensure the LaTeX paper is free of chktex warnings and compiles successfully into a PDF. You will achieve this by executing, analyzing, fixing, and re-validating the document.
-    You have been granted full tool access.
-
-    Guiding Principles:
-    - Scope: Do not perform any Git operations like commit or push. Your sole responsibility is to make the LaTeX document compilable.
-    - Method: When fixing errors, you MUST only modify existing files. Do not create new files.
-    - Minimal Edits: You MUST limit your changes to the absolute minimum required to fix LaTeX syntax, chktex warnings, or compilation errors.
-    - Autonomy: Execute all steps autonomously without asking for permission.
-
-    Procedure:
-    1.  Change Directory: First, change your working directory to `$LATEX_DIR`. All subsequent commands MUST be run from this directory.
-    2.  Run ChkTeX: Execute the command `bash -c "$CHKTEX_COMMAND"`.
-    3.  Analyze & Fix ChkTeX: If the command fails, you MUST analyze the chktex warnings from the output, fix the `paper.tex` file, and repeat step 2 until it passes.
-    4.  Run LaTeX Compile: Once chktex passes, execute `bash -c "$COMPILE_COMMAND"`.
-    5.  Analyze & Fix Compilation: If compilation fails, you MUST analyze the LaTeX errors (e.g., undefined control sequences, missing files, bad boxes), fix the `.tex` files, and repeat step 4 until it succeeds.
-    6.  Completion: Once both phases are complete, the task is finished.
- 
-
 jobs:
-  setup:
-    name: Setup Environment
+  autonomous-latex-fix-and-compile:
+    name: Autonomous LaTeX Fix and Compile Cycle
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    
+    env:
+      LATEX_DIR: .research/latex/${{ github.event.inputs.subdir }}
+      CHKTEX_COMMAND: |
+        set -e
+        echo "=== [PHASE 1/2] Running ChkTeX... ==="
+        chktex -q paper.tex
+      COMPILE_COMMAND: |
+        set -e
+        echo "=== [PHASE 2/2] Compiling LaTeX document... ==="
+        pdflatex -interaction=nonstopmode paper.tex
+        bibtex paper
+        pdflatex -interaction=nonstopmode paper.tex
+        pdflatex -interaction=nonstopmode paper.tex
+      PROMPT: |
+        You are a fully autonomous AI assistant specializing in LaTeX document correction.
+        Your task is to ensure the LaTeX paper is free of chktex warnings and compiles successfully into a PDF. You will achieve this by executing, analyzing, fixing, and re-validating the document.
+        You have been granted full tool access.
+
+        Guiding Principles:
+        - Scope: Do not perform any Git operations like commit or push. Your sole responsibility is to make the LaTeX document compilable.
+        - Method: When fixing errors, you MUST only modify existing files. Do not create new files.
+        - Minimal Edits: You MUST limit your changes to the absolute minimum required to fix LaTeX syntax, chktex warnings, or compilation errors.
+        - Autonomy: Execute all steps autonomously without asking for permission.
+
+        Procedure:
+        1.  Change Directory: First, change your working directory to `$LATEX_DIR`. All subsequent commands MUST be run from this directory.
+        2.  Run ChkTeX: Execute the command `bash -c "$CHKTEX_COMMAND"`.
+        3.  Analyze & Fix ChkTeX: If the command fails, you MUST analyze the chktex warnings from the output, fix the `paper.tex` file, and repeat step 2 until it passes.
+        4.  Run LaTeX Compile: Once chktex passes, execute `bash -c "$COMPILE_COMMAND"`.
+        5.  Analyze & Fix Compilation: If compilation fails, you MUST analyze the LaTeX errors (e.g., undefined control sequences, missing files, bad boxes), fix the `.tex` files, and repeat step 4 until it succeeds.
+        6.  Completion: Once both phases are complete, the task is finished.
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -92,58 +92,18 @@ jobs:
           echo "Image copy completed. Files in images/:"
           ls -la "${LATEX_DIR}/images/" || echo "No images found"
 
-      - name: Upload prepared workspace
-        uses: actions/upload-artifact@v4
+      - name: Run Claude Code
+        timeout-minutes: 20
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
         with:
-          name: workspace-${{ github.run_id }}
-          path: .
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: ${{ env.PROMPT }}
+          claude_args: "--max-turns=100 --allowed-tools Bash,Write,Edit,MultiEdit,TodoWrite"
 
-  claude-code-1:
-    name: Run Claude Code (Attempt 1)
-    needs: setup
-    timeout-minutes: 20
-    uses: ./.github/workflows/reusable_claude_code.yml
-    secrets: inherit
-    with:
-      prompt: ${{ env.PROMPT }}
-
-  claude-code-2:
-    name: Run Claude Code (Attempt 2)
-    needs: claude-code-1
-    if: failure()
-    timeout-minutes: 20
-    uses: ./.github/workflows/reusable_claude_code.yml
-    secrets: inherit
-    with:
-      prompt: ${{ env.PROMPT }}
-
-  claude-code-3:
-    name: Run Claude Code (Attempt 3)
-    needs: claude-code-2
-    if: failure()
-    timeout-minutes: 20
-    uses: ./.github/workflows/reusable_claude_code.yml
-    secrets: inherit
-    with:
-      prompt: ${{ env.PROMPT }}
-
-  finalize:
-    name: Commit and Push PDF
-    runs-on: ubuntu-latest
-    needs: [claude-code-1, claude-code-2, claude-code-3]
-    if: >-
-      !cancelled() && (
-        needs.claude-code-1.result == 'success' ||
-        needs.claude-code-2.result == 'success' ||
-        needs.claude-code-3.result == 'success'
-      )
-    steps:
-      - name: Download fixed workspace
-        uses: actions/download-artifact@v4
-        with:
-          name: workspace-${{ github.run_id }}
-
-      - name: Move compiled PDF to .research/
+      - name: Verify and Move compiled PDF
+        id: verify_pdf
+        continue-on-error: true
         run: |
           src="${LATEX_DIR}/paper.pdf"
           dest=".research/paper.pdf"
@@ -155,7 +115,8 @@ jobs:
             exit 1
           fi
 
-      - name: Commit and push LaTeX outputs
+      - name: Commit and push LaTeX outputs (on success)
+        if: steps.verify_pdf.outcome == 'success'
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
@@ -172,3 +133,13 @@ jobs:
           else
             echo "No changes were made by the agent."
           fi
+
+      - name: Trigger Workflow Re-run (on failure)
+        if: steps.verify_pdf.outcome == 'failure'
+        run: |
+          echo "Retrying workflow due to compilation failure."
+          gh workflow run "${{ github.workflow }}" --ref ${{ github.ref }} \
+            -f subdir='${{ github.event.inputs.subdir }}' \
+            -f iteration_id='${{ github.event.inputs.iteration_id }}'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
